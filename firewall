@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.5 2002-03-03 19:22:51 turbo Exp $
+# $Id: firewall,v 1.6 2002-03-03 19:27:28 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -42,7 +42,7 @@ if [ ! -f /etc/firewall.conf ]; then
     
     # ----- PORTS TO ALLOW ON LOCAL NET -----
     ALLOW="137:139"		# SMB/Samba
-    ALLOW="2988"		# AFbackup system
+    ALLOW="$ALLOW 2988"		# AFbackup system
     
     echo "done."
 else
@@ -279,7 +279,10 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.5  2002-03-03 19:22:51  turbo
+# Revision 1.6  2002-03-03 19:27:28  turbo
+# Add the variable to the variable. The last line overwrote the previous!
+#
+# Revision 1.5  2002/03/03 19:22:51  turbo
 # Removed the undefined defaults. They are specified in the config file...
 #
 # Revision 1.4  2002/03/03 19:09:20  turbo
