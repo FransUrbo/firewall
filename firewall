@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.8 2002-03-03 21:17:07 turbo Exp $
+# $Id: firewall,v 1.9 2002-03-03 21:27:34 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -153,7 +153,7 @@ chains () {
 
 # --------------------------------
 # Make sure we have the binaries...
-if [ ! -x $IPTABLES -o ! -x $RMMOD -o ! -x $MODPROBE ]; then
+if [ ! -x `echo $IPTABLES | sed 's@\ .*@@'` -o ! -x `echo $RMMOD | sed 's@\ .*@@'` -o ! -x `echo $MODPROBE | sed 's@\ .*@@'` ]; then
     echo "Some (or all) executables don't exists or isn't executable..."
     exit 1
 fi
@@ -163,8 +163,7 @@ fi
 if ! cat /proc/ksyms | grep -q ip_tables; then
     # Module not loaded, or no support for ip tables...
 
-    if [ ! -f /lib/modules/`uname -r`/kernel/net/ipv4/netfilter/ip_tables.o ]
-    then
+    if [ ! -f "/lib/modules/`uname -r`/kernel/net/ipv4/netfilter/ip_tables.o" ]; then
 	echo "You're not running a iptables enabled kernel!"
 	exit 2
     else
@@ -179,7 +178,7 @@ fi
 #####################################
 
 # Get the required IP addresses (internal/external)
-get_ip && error 1 "Error in getting IP address(es)..."c
+get_ip && error 1 "Error in getting IP address(es)..."
 
 case "$1" in
     start)
@@ -290,7 +289,12 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.8  2002-03-03 21:17:07  turbo
+# Revision 1.9  2002-03-03 21:27:34  turbo
+# * Since we added a redirect of stdout and stderr, we must filter out everything
+#   after the first space when checking for executable binary...
+# * Stray 'c' character after the get_ip() call.
+#
+# Revision 1.8  2002/03/03 21:17:07  turbo
 # * Send all output from rmmod/modprobe to /dev/null.
 # * Load the ip_nat_irc module if forwarding/masquerading.
 # * If masquerading to a PPTP server, load the ip_nat_pptp module, not
