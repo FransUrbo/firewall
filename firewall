@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.16 2002-09-07 14:09:42 turbo Exp $
+# $Id: firewall,v 1.17 2003-10-31 09:01:57 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -130,6 +130,20 @@ chains () {
 	    echo -n "$port "
 	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp --dport $port
 	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol udp --dport $port
+	done
+	echo
+    fi
+
+    # -------------
+    # Special circumstances - friendly hosts outside the external network
+    if [ ! -z "$FRIENDLY"; then
+	echo -n "$ECHO friendly hosts: "
+	for friend in $FRIENDLY; do
+	    echo -n "$friend "
+
+	    set -- `echo $friend | sed 's@:@ @g'` ; host=$1 ; port=$2
+	    $CHAIN -i $EXTERNAL_ETH -s $host -d $EXTERNAL_IP -j ACCEPT --protocol tcp --dport $port
+	    $CHAIN -i $EXTERNAL_ETH -s $host -d $EXTERNAL_IP -j ACCEPT --protocol udp --dport $port
 	done
 	echo
     fi
@@ -297,7 +311,14 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.16  2002-09-07 14:09:42  turbo
+# Revision 1.17  2003-10-31 09:01:57  turbo
+# Possibility to add 'friendly hosts'. That is, hosts that should be exepted
+# (on a port basis) from the ordinary block/reject rules..
+# Example: From work I'd like to connect to NTop. Naturally, this port should
+#          be absolutly hidden for the rest of the world. I don't even want my
+#          home network access!!
+#
+# Revision 1.16  2002/09/07 14:09:42  turbo
 # Unload the modules in the correct order. Can't remove
 # ipt_REJECT before the iptable_nat (etc)..
 #
