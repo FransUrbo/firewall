@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.11 2002-03-03 23:06:51 turbo Exp $
+# $Id: firewall,v 1.12 2002-03-04 11:24:22 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -17,10 +17,6 @@ if [ ! -f /etc/firewall.conf ]; then
     # If defined, see 'ALLOW' below for ports to allow on local network
     # - 'size' of network. 24 => a C-Net
     EXTERNAL_NET=24
-    #
-    # if Y or 1, do transparent proxy'ing...
-    # TODO: Don't work yet...
-    TRANS_PROXY=0
     
     # ----- PORTS TO BLOCK ----
     # ':' is a range... So ':19' means '0 to 19'...
@@ -220,10 +216,10 @@ case "$1" in
 
 	# -------------
 	# Enable the transparent proxy (force all connection through the proxy)
-	if echo $TRANS_PROXY | egrep -iq '^[Y1]'; then
+	if [ ! -z "$TRANS_PROXY" ]; then
 	    echo -n "Setting up transparent proxy: "
-#	    echo "done."
-	    echo "don't work yet..."
+	    $IPTABLES -t nat -A PREROUTING -s $INTERNAL_NET -d 0/0 --protocol tcp --destination-port 80 -j REDIRECT --to-ports $TRANS_PROXY
+	    echo "done."
 	fi
 
 	# -------------
@@ -290,7 +286,12 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.11  2002-03-03 23:06:51  turbo
+# Revision 1.12  2002-03-04 11:24:22  turbo
+# Added the transparent proxy support. The variable TRANS_PROXY is the
+# proxy port...
+# Removed the template TRANS_PROXY, it's specified in the config file...
+#
+# Revision 1.11  2002/03/03 23:06:51  turbo
 # * Only setup the local accepts if the variable ALLOW is non-null.
 # * Output the ports we're doing local accept on.
 # * Be more clear about the rejects entries (... on external/internal IP).
