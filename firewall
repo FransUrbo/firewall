@@ -1,8 +1,11 @@
 #!/bin/sh
 
+# $Id: firewall,v 1.2 2002-03-03 18:09:16 turbo Exp $
+
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
 
+    echo -n "Loading default firewall values... "
     # Where is the iptables, rmmod and modprobe binaries?
     IPTABLES=/sbin/iptables
     RMMOD=/sbin/rmmod
@@ -60,9 +63,13 @@ if [ ! -f /etc/firewall.conf ]; then
     # Syntax: EXTERNAL_PORT:INTERNAL_IP:INTERNAL_PORT
     #PORTS_FW=25:10.100.0.25:25
     #PORTS_FW="$PORTS_FW 22:192.168.1.2:22"
+
+    echo "done."
 else
     # Load the config file...
+    echo -n "Loading the firewall config file... "
     . /etc/firewall.conf
+    echo "done."
 fi
 
 
@@ -72,6 +79,16 @@ fi
 
 
 # --------------------------------
+# Output the error message, and exit with error code
+error () {
+    code=$1
+    shift
+    msg=$*
+
+    echo $msg
+    exit $code
+}
+
 # Find the IP address on the external interface
 get_ip () {
     # Get the external IP address
@@ -167,7 +184,7 @@ fi
 case "$1" in
     start)
 	# Get the required IP addresses (internal/external)
-	get_ip && (echo "Error in getting IP address(es)..." ; exit 1)
+	get_ip && error 1 "Error in getting IP address(es)..."
 
 	# Set up TCP/UDP rejects and accepts
 	chains add
@@ -258,3 +275,11 @@ case "$1" in
 	;;
 esac
 exit 0
+
+# $Log: firewall,v $
+# Revision 1.2  2002-03-03 18:09:16  turbo
+# * Pretty output when loading default/config file
+# * Created an error() function that outputs an error message and exits with
+#   specified error code.
+# * Added CVS keywords Id and Log.
+#
