@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.6 2002-03-03 19:27:28 turbo Exp $
+# $Id: firewall,v 1.7 2002-03-03 21:05:13 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -160,10 +160,16 @@ fi
 
 # --------------------------------
 # Are we running a iptables enabled kernel!?
-# TODO: Verify that this is correct
-if ! cat /proc/ksyms | grep -q ip_nat_setup; then
-    echo "You're not running a iptables enabled kernel!"
-    exit 2
+if ! cat /proc/ksyms | grep -q ip_tables; then
+    # Module not loaded, or no support for ip tables...
+
+    if [ ! -f /lib/modules/`uname -r`/kernel/net/ipv4/netfilter/ip_tables.o ]
+    then
+	echo "You're not running a iptables enabled kernel!"
+	exit 2
+    else
+	modprobe ip_tables
+    fi
 fi
 
 #####################################
@@ -279,7 +285,12 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.6  2002-03-03 19:27:28  turbo
+# Revision 1.7  2002-03-03 21:05:13  turbo
+# We might have ip tables as a module, so if we don't have the support in
+# the kernel (/proc/ksyms), we check to see if we have the actual module
+# (in /lib/modules/KERNELVER/kernel/net/ipv4/netfilter).
+#
+# Revision 1.6  2002/03/03 19:27:28  turbo
 # Add the variable to the variable. The last line overwrote the previous!
 #
 # Revision 1.5  2002/03/03 19:22:51  turbo
