@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.2 2002-03-03 18:09:16 turbo Exp $
+# $Id: firewall,v 1.3 2002-03-03 18:55:11 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -89,6 +89,7 @@ error () {
     exit $code
 }
 
+# --------------------------------
 # Find the IP address on the external interface
 get_ip () {
     # Get the external IP address
@@ -114,12 +115,17 @@ get_ip () {
     return 1
 }
 
+# --------------------------------
+# This is the main logic. Add/Remove the firewall rules we specify in the
+# config file
 chains () {
     if [ "$1" = "add" ]; then
-        CHAIN="$IPTABLES -A "
+        CHAIN="-A INPUT "
     else
-        CHAIN="$IPTABLES -D "
+        CHAIN="-D INPUT "
     fi
+    CHAIN="$IPTABLES $CHAIN"
+
 
     # -------------
     # Some local exeptions
@@ -127,10 +133,9 @@ chains () {
 	echo -n "Setting up local accepts: "
 	for port in $ALLOW; do
 	    echo -n "$port "
-	    
 	    if [ "$EXTERNAL_NET" != "" ]; then
-		$CHAIN INPUT -i $EXTERNAL_ETH -s $EXTERNAL_NET -d $EXTERNAL_IP -j ACCEPT --protocol tcp --dport $port
-		$CHAIN INPUT -i $EXTERNAL_ETH -s $EXTERNAL_NET -d $EXTERNAL_IP -j ACCEPT --protocol udp --dport $port
+		$CHAIN -i $EXTERNAL_ETH -s $EXTERNAL_NET -d $EXTERNAL_IP -j ACCEPT --protocol tcp --dport $port
+		$CHAIN -i $EXTERNAL_ETH -s $EXTERNAL_NET -d $EXTERNAL_IP -j ACCEPT --protocol udp --dport $port
 	    fi
 	done
 	echo " done."
@@ -141,8 +146,8 @@ chains () {
     if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
 	echo -n "Setting up accept to/from the internal network: "
 	for port in $PORTS; do
-	    $CHAIN INPUT -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp --dport $port
-	    $CHAIN INPUT -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol udp --dport $port
+	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp --dport $port
+	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol udp --dport $port
 	done
 	echo " done."
     fi
@@ -152,7 +157,7 @@ chains () {
     echo -n "Setting up TCP rejects: "
     for port in $PORTS; do
 	echo -n "$port "
-	$CHAIN INPUT -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j REJECT --reject-with tcp-reset --protocol tcp --dport $port
+	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j REJECT --reject-with tcp-reset --protocol tcp --dport $port
     done
     echo " done."
 
@@ -161,19 +166,19 @@ chains () {
     echo -n "Setting up UDP rejects: "
     for port in $PORTS; do
 	echo -n "$port "
-	$CHAIN INPUT -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j DROP  --protocol udp --dport $port
+	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j DROP  --protocol udp --dport $port
     done
     echo " done."
 }
 
-##############################
-
+# --------------------------------
 # Make sure we have the binaries...
 if [ ! -x $IPTABLES -o ! -x $RMMOD -o ! -x $MODPROBE ]; then
     echo "Some (or all) executables don't exists or isn't executable..."
     exit 1
 fi
 
+# --------------------------------
 # Are we running a iptables enabled kernel!?
 # TODO: Verify that this is correct
 if ! cat /proc/ksyms | grep -q ip_nat_setup; then
@@ -181,14 +186,21 @@ if ! cat /proc/ksyms | grep -q ip_nat_setup; then
     exit 2
 fi
 
+#####################################
+#                                   #
+# M A I N  P R O G R A M  B E L O W #
+#                                   #
+#####################################
+
+# Get the required IP addresses (internal/external)
+get_ip && error 1 "Error in getting IP address(es)..."c
+
 case "$1" in
     start)
-	# Get the required IP addresses (internal/external)
-	get_ip && error 1 "Error in getting IP address(es)..."
-
 	# Set up TCP/UDP rejects and accepts
 	chains add
 
+	# -------------
 	# Do portforwarding
 	if [ "$PORTS_FW" != "" ]; then
 	    echo -n "Forwarding external port: "
@@ -200,6 +212,7 @@ case "$1" in
 	    echo ""
 	fi
 
+	# -------------
 	# Masquerade internal traffic
 	if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
 	    echo -n "Setting up masquerading of network $INTERNAL_NET on $INTERNAL_ETH... "
@@ -218,19 +231,20 @@ case "$1" in
 	    fi
 	fi
 
-	# Execute local scripts
-	if [ -f "$0.local" ]; then
-	    $0.local start
-	fi
-
+	# -------------
 	# Enable the transparent proxy (force all connection through the proxy)
 	if echo $TRANS_PROXY | egrep -iq '^[Y1]'; then
 	    echo -n "Setting up transparent proxy: "
 #	    echo "done."
 	    echo "don't work yet..."
 	fi
+
+	# -------------
+	# Execute local scripts
+	if [ -f "$0.local" ]; then
+	    $0.local start
+	fi
 	;;
-    ###############################
     stop)
 	# Remove the TCP/UDP rejects and accepts
 	chains del
@@ -277,7 +291,16 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.2  2002-03-03 18:09:16  turbo
+# Revision 1.3  2002-03-03 18:55:11  turbo
+# * Added some comment lines before each major command to distinguish them
+# * We're only modifying the INPUT chain in the chains() function, so include
+#   that into the short hand ($CHAIN) at the top (so we can improve easily on
+#   the function).
+# * Make sure we call get_ip() wheter we're called with start or stop...
+# * Put the execution of the local script at the end (after setting up
+#   transparent proxy).
+#
+# Revision 1.2  2002/03/03 18:09:16  turbo
 # * Pretty output when loading default/config file
 # * Created an error() function that outputs an error message and exits with
 #   specified error code.
