@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.17 2003-10-31 09:01:57 turbo Exp $
+# $Id: firewall,v 1.18 2003-10-31 09:13:32 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -136,7 +136,7 @@ chains () {
 
     # -------------
     # Special circumstances - friendly hosts outside the external network
-    if [ ! -z "$FRIENDLY"; then
+    if [ ! -z "$FRIENDLY" ]; then
 	echo -n "$ECHO friendly hosts: "
 	for friend in $FRIENDLY; do
 	    echo -n "$friend "
@@ -311,7 +311,10 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.17  2003-10-31 09:01:57  turbo
+# Revision 1.18  2003-10-31 09:13:32  turbo
+# Missing ] in 'if then fi'...
+#
+# Revision 1.17  2003/10/31 09:01:57  turbo
 # Possibility to add 'friendly hosts'. That is, hosts that should be exepted
 # (on a port basis) from the ordinary block/reject rules..
 # Example: From work I'd like to connect to NTop. Naturally, this port should
