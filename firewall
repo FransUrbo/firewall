@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.9 2002-03-03 21:27:34 turbo Exp $
+# $Id: firewall,v 1.10 2002-03-03 21:34:53 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -263,7 +263,7 @@ case "$1" in
 	    echo "done."
 
 	    echo -n "Unloading module: "
-	    for module in "ip_nat_ftp ip_nat_irc ip_conntrack_ftp ip_conntrack_irc iptable_nat ip_conntrack ip_tables"; do
+	    for module in "ip_nat_ftp ip_nat_irc ip_conntrack_ftp ip_conntrack_irc ip_conntrack_pptp iptable_nat ip_conntrack ip_tables"; do
 		echo -n "$module "
 		$RMMOD $module
 	    done
@@ -289,7 +289,10 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.9  2002-03-03 21:27:34  turbo
+# Revision 1.10  2002-03-03 21:34:53  turbo
+# Remove the ip_conntrack_pptp as well when disabling masquerading.
+#
+# Revision 1.9  2002/03/03 21:27:34  turbo
 # * Since we added a redirect of stdout and stderr, we must filter out everything
 #   after the first space when checking for executable binary...
 # * Stray 'c' character after the get_ip() call.
