@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.4 2002-03-03 19:09:20 turbo Exp $
+# $Id: firewall,v 1.5 2002-03-03 19:22:51 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -17,21 +17,6 @@ if [ ! -f /etc/firewall.conf ]; then
     # If defined, see 'ALLOW' below for ports to allow on local network
     # - 'size' of network. 24 => a C-Net
     EXTERNAL_NET=24
-    #
-    # --- FOR MASQUERADING ---
-    # Internal ethernet device
-    #INTERNAL_ETH=eth1
-    #
-    # If defined, forward internal network
-    # - 'size' of network. 24 => a C-Net
-    #INTERNAL_NET=24
-    #
-    # If defined, masquerade from internal client to the PPTP VPN Server
-    # - If the PPTP server is located on the inside, don't specify here, add
-    #   the IP to PORTS_FW (for portforwarding) instead...
-    # TODO: Don't work yet...
-    #PPTP_SERVER=212.247.15.77
-    #PPTP_CLIENT=192.168.1.10
     #
     # if Y or 1, do transparent proxy'ing...
     # TODO: Don't work yet...
@@ -59,11 +44,6 @@ if [ ! -f /etc/firewall.conf ]; then
     ALLOW="137:139"		# SMB/Samba
     ALLOW="2988"		# AFbackup system
     
-    # ----- PORTS TO FORWARD FROM EXTERNAL TO INTERNAL -----
-    # Syntax: EXTERNAL_PORT:INTERNAL_IP:INTERNAL_PORT
-    #PORTS_FW=25:10.100.0.25:25
-    #PORTS_FW="$PORTS_FW 22:192.168.1.2:22"
-
     echo "done."
 else
     # Load the config file...
@@ -299,7 +279,10 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.4  2002-03-03 19:09:20  turbo
+# Revision 1.5  2002-03-03 19:22:51  turbo
+# Removed the undefined defaults. They are specified in the config file...
+#
+# Revision 1.4  2002/03/03 19:09:20  turbo
 # * Check to see if the local firewall setup script is EXECUTABLE, not EXISTING.
 # * More comment lines before major executions
 # * Run the local script when stopping firewall as well
