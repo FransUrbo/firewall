@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.14 2002-06-25 08:37:06 turbo Exp $
+# $Id: firewall,v 1.15 2002-06-25 09:00:48 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -140,7 +140,7 @@ chains () {
 	echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j REJECT --reject-with tcp-reset --protocol tcp --dport $port
     done
-    echo " done."
+    echo "."
 
     # -------------
     # Setting up UDP rejects
@@ -149,7 +149,7 @@ chains () {
 	echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j DROP  --protocol udp --dport $port
     done
-    echo " done."
+    echo "."
 }
 
 # --------------------------------
@@ -220,7 +220,7 @@ case "$1" in
 
 	# -------------
 	# Enable the transparent proxy (force all connection through the proxy)
-	if [ ! -z "$TRANS_PROXY" ]; then
+	if [ ! -z "$TRANS_PROXY" -a "$TRANS_PROXY" != "0" ]; then
 	    echo -n "Setting up transparent proxy: "
 	    $IPTABLES -t nat -A PREROUTING -s $INTERNAL_NET -d 0/0 --protocol tcp --destination-port 80 -j REDIRECT --to-ports $TRANS_PROXY
 	    echo "done."
@@ -270,9 +270,9 @@ case "$1" in
 	    echo "done."
 
 	    echo -n "Unloading module: "
-	    for module in "ip_nat_ftp ip_nat_irc ip_conntrack_ftp ip_conntrack_irc ip_conntrack_pptp iptable_nat ip_conntrack ip_tables"; do
+	    for module in "ip_nat_ftp ip_nat_irc ip_conntrack_ftp ip_conntrack_irc ip_conntrack_pptp ipt_MASQUERADE ipt_REJECT iptable_filter iptable_nat ip_conntrack ip_tables"; do
 		echo -n "$module "
-		$RMMOD $module
+		$RMMOD $module > /dev/null 2>&1
 	    done
 	    echo
 	fi
@@ -296,7 +296,15 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.14  2002-06-25 08:37:06  turbo
+# Revision 1.15  2002-06-25 09:00:48  turbo
+# * Don't output 'done.' when removing/setting up UDP/TCP rejects etc.
+#   Just '.' and newline. Looks better.
+# * Make sure that TRANS_PROXY don't contain '0' (which would mean that
+#   we want to disable this feature).
+# * Remove some more module (ipt_MASQUERADE, ipt_REJECT, iptable_filter)
+#   BEFORE removing iptable_nat etc. Dependencies...
+#
+# Revision 1.14  2002/06/25 08:37:06  turbo
 # * We can't send STD{OUT,ERR} to /dev/null. For some reason
 #   the commandline think it's a module to remove. I'll look into
 #   that some other time...
