@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.12 2002-03-04 11:24:22 turbo Exp $
+# $Id: firewall,v 1.13 2002-03-04 12:07:49 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -227,6 +227,12 @@ case "$1" in
 	if [ -x "$0.local" ]; then
 	    $0.local start
 	fi
+
+	# -------------
+	# Block specific hosts. Probably spammers/portscanners...
+	if [ -f "/etc/firewall.block.conf" -a -x "/usr/local/sbin/reject_ip" ]; then
+	    /usr/local/sbin/reject_ip add
+	fi
 	;;
     stop)
 	# Remove the TCP/UDP rejects and accepts
@@ -286,7 +292,10 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.12  2002-03-04 11:24:22  turbo
+# Revision 1.13  2002-03-04 12:07:49  turbo
+# If we have the file /etc/firewall.block.conf AND /usr/local/sbin/reject_ip is executable, block certain hosts (spammers and/or portscanners probably)
+#
+# Revision 1.12  2002/03/04 11:24:22  turbo
 # Added the transparent proxy support. The variable TRANS_PROXY is the
 # proxy port...
 # Removed the template TRANS_PROXY, it's specified in the config file...
