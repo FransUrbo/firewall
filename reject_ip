@@ -1,0 +1,120 @@
+#!/bin/sh -e
+
+if [ ! -f /etc/firewall.conf ]; then
+    # The config file don't exists, load this script with default values...
+
+    echo -n "Loading default firewall values... "
+    # Where is the iptables, rmmod and modprobe binaries?
+    IPTABLES=/sbin/iptables
+    RMMOD="/sbin/rmmod > /dev/null 2>&1 "
+    MODPROBE="/sbin/modprobe > /dev/null 2>&1 "
+    #
+    # External ethernet device
+    EXTERNAL_ETH=eth0
+    #
+    # If defined, see 'ALLOW' below for ports to allow on local network
+    # - 'size' of network. 24 => a C-Net
+    EXTERNAL_NET=24
+else
+    # Load the config file...
+    echo -n "Loading the firewall config file... "
+    . /etc/firewall.conf
+    echo "done."
+fi
+
+
+# -------
+# DONE WITH LOCAL CONFIGURATIONS. DON'T CHANGE ANYTHING BELOW!
+# -------
+
+
+# --------------------------------
+# Output the error message, and exit with error code
+error () {
+    code=$1
+    shift
+    msg=$*
+
+    echo $msg
+    exit $code
+}
+
+# --------------------------------
+# Find the IP address on the external interface
+get_ip () {
+    # Get the external IP address
+    set -- `ifconfig $EXTERNAL_ETH | grep inet`; shift
+    EXTERNAL_IP=`echo $1 | sed 's@addr:@@'`
+    EXTERNAL_NET="$EXTERNAL_IP/$EXTERNAL_NET"
+
+    # Get the internal IP address
+    if [ "$INTERNAL_ETH" != "" ]; then
+	set -- `ifconfig $INTERNAL_ETH | grep inet`; shift
+	INTERNAL_IP=`echo $1 | sed 's@addr:@@'`
+	INTERNAL_NET="$INTERNAL_IP/$INTERNAL_NET"
+    fi
+
+    # Return ok if we have an external IP, and the internal IP is found
+    # If we haven't specified a internal ethernet interface, ignore the
+    # unavilible internal IP...
+    if [ "$EXTERNAL_IP" == "" -o "$INTERNAL_IP" == "" -a "$INTERNAL_ETH" != "" ]; then
+        return 0
+    fi
+
+    # We have failed to obtain the IP addresses!
+    return 1
+}
+
+#####################################
+#                                   #
+# M A I N  P R O G R A M  B E L O W #
+#                                   #
+#####################################
+
+if [ -z "$1" ]; then
+    echo "Usage: `basename $0` [add|rem] [ips_to_block]"
+    exit 1
+elif ! echo $1 | grep -q ^[a-z]; then
+    echo "Usage: `basename $0` [add|rem] [ips_to_block]"
+    exit 1
+fi
+
+# Get the required IP addresses (internal/external)
+get_ip && error 1 "Error in getting IP address(es)..."
+
+if [ "$1" == "add" ]; then
+    cmd=add
+    CHAIN="/sbin/iptables -A INPUT -i $EXTERNAL_ETH -d $EXTERNAL_IP -j DROP"
+elif [ "$1" == "rem" ]; then
+    cmd=rem
+    CHAIN="/sbin/iptables -D INPUT -i $EXTERNAL_ETH -d $EXTERNAL_IP -j DROP"
+fi
+shift
+
+# Create the blocklist
+if [ -f /etc/firewall.block.conf -a "$cmd" == "add" ]; then
+    # We have a blockfile, and we're ADDING -> Scan the config
+    # file...
+    BLOCKS=`cat /etc/firewall.block.conf | grep -v ^\#`
+fi
+
+# Add the commandline IPs to the list
+BLOCKS="$BLOCKS $*"
+
+# --------------------------------
+# The actual logic...
+for ip in `echo $BLOCKS`; do
+    if ! /sbin/iptables -L INPUT -n | grep ^DROP | grep -q $ip; then
+	# The block don't exist, add one
+	$CHAIN -s $ip --protocol tcp
+	$CHAIN -s $ip --protocol udp
+
+	if [ "$cmd" == "add" ]; then
+	    if ! cat /etc/firewall.block.conf | grep -q $ip; then
+		# The IP isn't registered in our block list, add it!
+		echo $ip >> /etc/firewall.block.conf
+	    fi
+	fi
+    fi
+done
+
