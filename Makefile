@@ -1,9 +1,9 @@
 install all:	clean
 	@( \
-	  cp firewall /etc/init.d/; \
+	  cp -v firewall /etc/init.d/; \
 	  if [ ! -f /etc/firewall.conf ]; then \
-	    cp firewall.conf /etc; \
-	  if; \
+	    cp -v firewall.conf /etc; \
+	  fi; \
 	)
 
 clean:
