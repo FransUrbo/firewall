@@ -1,0 +1,247 @@
+#!/bin/sh
+
+if [ ! -f /etc/firewall.conf ]; then
+    # The config file don't exists, load this script with default values...
+
+    # Where is the iptables, rmmod and modprobe binaries?
+    IPTABLES=/sbin/iptables
+    RMMOD=/sbin/rmmod
+    MODPROBE=/sbin/modprobe
+    #
+    # External ethernet device
+    EXTERNAL_ETH=eth0
+    #
+    # If defined, see 'ALLOW' below for ports to allow on local network
+    # - 'size' of network. 24 => a C-Net
+    EXTERNAL_NET=24
+    #
+    # --- FOR MASQUERADING ---
+    # Internal ethernet device
+    #INTERNAL_ETH=eth1
+    #
+    # If defined, forward internal network
+    # - 'size' of network. 24 => a C-Net
+    #INTERNAL_NET=24
+    #
+    # If defined, masquerade from internal client to the PPTP VPN Server
+    # - If the PPTP server is located on the inside, don't specify here, add
+    #   the IP to PORTS_FW (for portforwarding) instead...
+    # TODO: Don't work yet...
+    #PPTP_SERVER=212.247.15.77
+    #PPTP_CLIENT=192.168.1.10
+    #
+    # if Y or 1, do transparent proxy'ing...
+    # TODO: Don't work yet...
+    TRANS_PROXY=0
+    
+    # ----- PORTS TO BLOCK ----
+    # ':' is a range... So ':19' means '0 to 19'...
+    PORTS=":19"			# Block: 0-19
+    PORTS="$PORTS 26:52"	# Open:  ssh, telnet, smtp
+    PORTS="$PORTS 54:79"	# Open:  domain
+    PORTS="$PORTS 81:87"	# Open:  http
+    PORTS="$PORTS 89:109"	# Open:  kerberos, pop3
+    PORTS="$PORTS 111"		# Close: SunRPC
+    PORTS="$PORTS 115:142"	# Open:  Auth, SFTP
+    PORTS="$PORTS 144:388"	# Open:  ldap
+    PORTS="$PORTS 390:442"	# Open:  imap2
+    PORTS="$PORTS 444:635"	# Open:  https
+    PORTS="$PORTS 637:992"	# Open:  ldaps
+    PORTS="$PORTS 994"		# Open:  imaps
+    PORTS="$PORTS 996:1023"	# Open:  pop3s
+    PORTS="$PORTS 3306"		# Block: mysql
+    PORTS="$PORTS 6000"		# Block: X11
+    
+    # ----- PORTS TO ALLOW ON LOCAL NET -----
+    ALLOW="137:139"		# SMB/Samba
+    ALLOW="2988"		# AFbackup system
+    
+    # ----- PORTS TO FORWARD FROM EXTERNAL TO INTERNAL -----
+    # Syntax: EXTERNAL_PORT:INTERNAL_IP:INTERNAL_PORT
+    #PORTS_FW=25:10.100.0.25:25
+    #PORTS_FW="$PORTS_FW 22:192.168.1.2:22"
+else
+    # Load the config file...
+    . /etc/firewall.conf
+fi
+
+
+# -------
+# DONE WITH LOCAL CONFIGURATIONS. DON'T CHANGE ANYTHING BELOW!
+# -------
+
+
+# --------------------------------
+# Find the IP address on the external interface
+get_ip () {
+    # Get the external IP address
+    set -- `ifconfig $EXTERNAL_ETH | grep inet`; shift
+    EXTERNAL_IP=`echo $1 | sed 's@addr:@@'`
+    EXTERNAL_NET="$EXTERNAL_IP/$EXTERNAL_NET"
+
+    # Get the internal IP address
+    if [ "$INTERNAL_ETH" != "" ]; then
+	set -- `ifconfig $INTERNAL_ETH | grep inet`; shift
+	INTERNAL_IP=`echo $1 | sed 's@addr:@@'`
+	INTERNAL_NET="$INTERNAL_IP/$INTERNAL_NET"
+    fi
+
+    # Return ok if we have an external IP, and the internal IP is found
+    # If we haven't specified a internal ethernet interface, ignore the
+    # unavilible internal IP...
+    if [ "$EXTERNAL_IP" == "" -o "$INTERNAL_IP" == "" -a "$INTERNAL_ETH" != "" ]; then
+        return 0
+    fi
+
+    # We have failed to obtain the IP addresses!
+    return 1
+}
+
+chains () {
+    if [ "$1" = "add" ]; then
+        CHAIN="$IPTABLES -A "
+    else
+        CHAIN="$IPTABLES -D "
+    fi
+
+    # -------------
+    # Some local exeptions
+    if [ "$EXTERNAL_NET" != "" ]; then
+	echo -n "Setting up local accepts: "
+	for port in $ALLOW; do
+	    echo -n "$port "
+	    
+	    if [ "$EXTERNAL_NET" != "" ]; then
+		$CHAIN INPUT -i $EXTERNAL_ETH -s $EXTERNAL_NET -d $EXTERNAL_IP -j ACCEPT --protocol tcp --dport $port
+		$CHAIN INPUT -i $EXTERNAL_ETH -s $EXTERNAL_NET -d $EXTERNAL_IP -j ACCEPT --protocol udp --dport $port
+	    fi
+	done
+	echo " done."
+    fi
+
+    # -------------
+    # Setting up accepts on PORT to/from our local network
+    if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
+	echo -n "Setting up accept to/from the internal network: "
+	for port in $PORTS; do
+	    $CHAIN INPUT -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp --dport $port
+	    $CHAIN INPUT -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol udp --dport $port
+	done
+	echo " done."
+    fi
+
+    # -------------
+    # Setting up TCP rejects
+    echo -n "Setting up TCP rejects: "
+    for port in $PORTS; do
+	echo -n "$port "
+	$CHAIN INPUT -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j REJECT --reject-with tcp-reset --protocol tcp --dport $port
+    done
+    echo " done."
+
+    # -------------
+    # Setting up UDP rejects
+    echo -n "Setting up UDP rejects: "
+    for port in $PORTS; do
+	echo -n "$port "
+	$CHAIN INPUT -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j DROP  --protocol udp --dport $port
+    done
+    echo " done."
+}
+
+##############################
+
+case "$1" in
+    start)
+	# Get the required IP addresses (internal/external)
+	get_ip && (echo "Error in getting IP address(es)..." ; exit 1)
+
+	# Set up TCP/UDP rejects and accepts
+	chains add
+
+	# Do portforwarding
+	if [ "$PORTS_FW" != "" ]; then
+	    echo -n "Forwarding external port: "
+	    for entry in $PORTS_FW; do
+		set -- `echo $entry | sed 's@:@ @g'`
+		echo -n "$1->$2:$3 "
+		$IPTABLES -t nat -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
+	    done
+	    echo ""
+	fi
+
+	# Masquerade internal traffic
+	if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
+	    echo -n "Setting up masquerading of network $INTERNAL_NET on $INTERNAL_ETH... "
+	    echo 1 > /proc/sys/net/ipv4/ip_forward 
+	    $MODPROBE ip_nat_ftp
+
+	    $IPTABLES -t nat -A POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
+	    echo "done."
+
+	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then
+		echo -n "VPN masquerading $PPTP_CLIENT to $PPTP_SERVER: "
+		$MODPROBE iptable_nat
+		$IPTABLES -t nat -A PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
+		$IPTABLES -t nat -A PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
+		echo "done."
+	    fi
+	fi
+
+	# Execute local scripts
+	if [ -f "$0.local" ]; then
+	    $0.local start
+	fi
+
+	# Enable the transparent proxy (force all connection through the proxy)
+	if echo $TRANS_PROXY | egrep -iq '^[Y1]'; then
+	    echo -n "Setting up transparent proxy: "
+#	    echo "done."
+	    echo "don't work yet..."
+	fi
+	;;
+    ###############################
+    stop)
+	# Remove the TCP/UDP rejects and accepts
+	chains del
+
+	# Disable the portforwarding
+	if [ "$PORTS_FW" != "" ]; then
+	    echo "Removing port forwarding of port: "
+	    for entry in $PORTS_FW; do
+		set -- `echo $entry | sed 's@:@ @g'`
+		echo -n "$1 "
+		$IPTABLES -t nat -D PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT  --to $2:$3
+	    done
+	    echo "done."
+	fi
+
+	# Portforwarding av internal trafic
+	if [ "$INTERNAL_NET" != "" ]; then
+	    echo "Removing internal network masquerading... "
+	    $IPTABLES -t nat -D POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
+
+	    echo 0 > /proc/sys/net/ipv4/ip_forward 
+	    $RMMOD ip_conntrack_ftp
+	    $RMMOD ip_conntrack
+	    $RMMOD ip_nat_ftp
+	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then
+#		$IPTABLES -t nat -D PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
+#		$IPTABLES -t nat -D PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
+
+		$RMMOD iptable_nat
+	    fi
+	    echo "done."
+	fi
+	;;
+    flush)
+	echo -n "Flushing firewall rules... "
+	$IPTABLES -F
+	$IPTABLES -F -t nat
+	echo "done."
+	;;
+    *)
+	echo "Usage: $0 {start|stop}" >&2
+	;;
+esac
+exit 0
