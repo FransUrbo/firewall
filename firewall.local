@@ -1,0 +1,109 @@
+#!/bin/sh
+
+# $Id: firewall.local,v 1.1 2002-03-03 19:04:48 turbo Exp $
+
+if [ ! -f /etc/firewall.conf ]; then
+    # The config file don't exists, load this script with default values...
+
+    echo -n "Loading default firewall values... "
+    # Where is the iptables, rmmod and modprobe binaries?
+    IPTABLES=/sbin/iptables
+    RMMOD=/sbin/rmmod
+    MODPROBE=/sbin/modprobe
+    #
+    # External ethernet device
+    EXTERNAL_ETH=eth0
+    #
+    # If defined, see 'ALLOW' below for ports to allow on local network
+    # - 'size' of network. 24 => a C-Net
+    EXTERNAL_NET=24
+    #
+    # --- FOR MASQUERADING ---
+    # Internal ethernet device
+    #INTERNAL_ETH=eth1
+    #
+    # If defined, forward internal network
+    # - 'size' of network. 24 => a C-Net
+    #INTERNAL_NET=24
+else
+    # Load the config file...
+    echo -n "Loading the firewall config file... "
+    . /etc/firewall.conf
+    echo "done."
+fi
+
+
+# -------
+# DONE WITH LOCAL CONFIGURATIONS. DON'T CHANGE ANYTHING BELOW!
+# -------
+
+
+# --------------------------------
+# Output the error message, and exit with error code
+error () {
+    code=$1
+    shift
+    msg=$*
+
+    echo $msg
+    exit $code
+}
+
+# --------------------------------
+# Find the IP address on the external interface (eth0)
+get_ip () {
+    # Get the external IP address
+    set -- `ifconfig $EXTERNAL_ETH | grep inet`; shift
+    EXTERNAL_IP=`echo $1 | sed 's@addr:@@'`
+    EXTERNAL_NET="$EXTERNAL_IP/$EXTERNAL_NET"
+
+    # Get the internal IP address
+    if [ "$INTERNAL_ETH" != "" ]; then
+	set -- `ifconfig $INTERNAL_ETH | grep inet`; shift
+	INTERNAL_IP=`echo $1 | sed 's@addr:@@'`
+	INTERNAL_NET="$INTERNAL_IP/$INTERNAL_NET"
+    fi
+
+    # Return ok if we have an external IP, and the internal IP is found
+    # If we haven't specified a internal ethernet interface, ignore the
+    # unavilible internal IP...
+    if [ "$EXTERNAL_IP" == "" -o "$INTERNAL_IP" == "" -a "$INTERNAL_ETH" != "" ]; then
+        return 0
+    fi
+
+    # We have failed to obtain the IP addresses!
+    return 1
+}
+
+# --------------------------------
+# Are we running a iptables enabled kernel!?
+# TODO: Verify that this is correct
+if ! cat /proc/ksyms | grep -q ip_nat_setup; then
+    echo "You're not running a iptables enabled kernel!"
+    exit 2
+fi
+
+#####################################
+#                                   #
+# M A I N  P R O G R A M  B E L O W #
+#                                   #
+#####################################
+
+# Get the required IP addresses (internal/external)
+get_ip && error 1 "Error in getting IP address(es)..."c
+
+# Do your thing here!
+
+case "$1" in
+    start)
+	;;
+    stop)
+	;;
+esac
+exit 0
+
+# $Log: firewall.local,v $
+# Revision 1.1  2002-03-03 19:04:48  turbo
+# This is a 'dummy' script that can be used as a skeleton for local
+# firewall configuration.
+#
