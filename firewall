@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.15 2002-06-25 09:00:48 turbo Exp $
+# $Id: firewall,v 1.16 2002-09-07 14:09:42 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -20,25 +20,26 @@ if [ ! -f /etc/firewall.conf ]; then
     
     # ----- PORTS TO BLOCK ----
     # ':' is a range... So ':19' means '0 to 19'...
-    PORTS=":19"			# Block: 0-19
-    PORTS="$PORTS 26:52"	# Open:  ssh, telnet, smtp
-    PORTS="$PORTS 54:79"	# Open:  domain
-    PORTS="$PORTS 81:87"	# Open:  http
-    PORTS="$PORTS 89:109"	# Open:  kerberos, pop3
-    PORTS="$PORTS 111"		# Close: SunRPC
-    PORTS="$PORTS 115:142"	# Open:  Auth, SFTP
-    PORTS="$PORTS 144:388"	# Open:  ldap
-    PORTS="$PORTS 390:442"	# Open:  imap2
-    PORTS="$PORTS 444:635"	# Open:  https
-    PORTS="$PORTS 637:992"	# Open:  ldaps
-    PORTS="$PORTS 994"		# Open:  imaps
-    PORTS="$PORTS 996:1023"	# Open:  pop3s
-    PORTS="$PORTS 3306"		# Block: mysql
-    PORTS="$PORTS 6000"		# Block: X11
+    PORTS=":19"				# Block: 0-19
+    PORTS="$PORTS 26:52"		# Open:  ssh, telnet, smtp
+    PORTS="$PORTS 54:79"		# Open:  domain
+    PORTS="$PORTS 81:87"		# Open:  http
+    PORTS="$PORTS 89:109"		# Open:  kerberos, pop3
+    PORTS="$PORTS 111"			# Close: SunRPC
+    PORTS="$PORTS 115:142"		# Open:  Auth, SFTP
+    PORTS="$PORTS 144:388"		# Open:  ldap
+    PORTS="$PORTS 390:442"		# Open:  imap2
+    PORTS="$PORTS 444:635"		# Open:  https
+    PORTS="$PORTS 637:992"		# Open:  ldaps
+    PORTS="$PORTS 994"			# Open:  imaps
+    PORTS="$PORTS 996:1023"		# Open:  pop3s
+    PORTS="$PORTS 1061 1214 1832"	# Block: Crappy filesharing protocols
+    PORTS="$PORTS 3306"			# Block: mysql
+    PORTS="$PORTS 6000"			# Block: X11
     
     # ----- PORTS TO ALLOW ON LOCAL NET -----
-    ALLOW="137:139"		# SMB/Samba
-    ALLOW="$ALLOW 2988"		# AFbackup system
+    ALLOW="137:139"			# SMB/Samba
+    ALLOW="$ALLOW 2988"			# AFbackup system
     
     echo "done."
 else
@@ -270,7 +271,7 @@ case "$1" in
 	    echo "done."
 
 	    echo -n "Unloading module: "
-	    for module in "ip_nat_ftp ip_nat_irc ip_conntrack_ftp ip_conntrack_irc ip_conntrack_pptp ipt_MASQUERADE ipt_REJECT iptable_filter iptable_nat ip_conntrack ip_tables"; do
+	    for module in "ip_nat_ftp ip_conntrack_ftp ip_nat_irc ip_conntrack_irc ip_nat_pptp ip_conntrack_pptp ipt_MASQUERADE iptable_nat ip_conntrack ipt_REJECT iptable_filter ip_tables"; do
 		echo -n "$module "
 		$RMMOD $module > /dev/null 2>&1
 	    done
@@ -296,7 +297,11 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.15  2002-06-25 09:00:48  turbo
+# Revision 1.16  2002-09-07 14:09:42  turbo
+# Unload the modules in the correct order. Can't remove
+# ipt_REJECT before the iptable_nat (etc)..
+#
+# Revision 1.15  2002/06/25 09:00:48  turbo
 # * Don't output 'done.' when removing/setting up UDP/TCP rejects etc.
 #   Just '.' and newline. Looks better.
 # * Make sure that TRANS_PROXY don't contain '0' (which would mean that
