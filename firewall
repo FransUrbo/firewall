@@ -151,6 +151,19 @@ chains () {
 
 ##############################
 
+# Make sure we have the binaries...
+if [ ! -x $IPTABLES -o ! -x $RMMOD -o ! -x $MODPROBE ]; then
+    echo "Some (or all) executables don't exists or isn't executable..."
+    exit 1
+fi
+
+# Are we running a iptables enabled kernel!?
+# TODO: Verify that this is correct
+if ! cat /proc/ksyms | grep -q ip_nat_setup; then
+    echo "You're not running a iptables enabled kernel!"
+    exit 2
+fi
+
 case "$1" in
     start)
 	# Get the required IP addresses (internal/external)
