@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-# $Id: reject_ip,v 1.2 2002-09-07 14:01:16 turbo Exp $
+# $Id: reject_ip,v 1.3 2003-12-04 06:59:04 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -86,10 +86,10 @@ get_ip && error 1 "Error in getting IP address(es)..."
 
 if [ "$1" == "add" ]; then
     cmd=add
-    CHAIN="/sbin/iptables -A INPUT -i $EXTERNAL_ETH -d $EXTERNAL_IP -j DROP"
+    CHAIN="/sbin/iptables -A INPUT -i $EXTERNAL_ETH -d $EXTERNAL_IP -j "
 elif [ "$1" == "rem" ]; then
     cmd=rem
-    CHAIN="/sbin/iptables -D INPUT -i $EXTERNAL_ETH -d $EXTERNAL_IP -j DROP"
+    CHAIN="/sbin/iptables -D INPUT -i $EXTERNAL_ETH -d $EXTERNAL_IP -j "
 fi
 shift
 
@@ -108,8 +108,8 @@ BLOCKS="$BLOCKS $*"
 for ip in `echo $BLOCKS`; do
     if ! /sbin/iptables -L INPUT -n | grep ^DROP | grep -q $ip; then
 	# The block don't exist, add one
-	$CHAIN -s $ip --protocol tcp
-	$CHAIN -s $ip --protocol udp
+	$CHAIN REJECT --reject-with tcp-reset -s $ip --protocol tcp
+	$CHAIN DROP -s $ip --protocol udp
 
 	if [ "$cmd" == "add" ]; then
 	    if ! cat /etc/firewall.block.conf | grep -q $ip; then
