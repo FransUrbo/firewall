@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.7 2002-03-03 21:05:13 turbo Exp $
+# $Id: firewall,v 1.8 2002-03-03 21:17:07 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -8,8 +8,8 @@ if [ ! -f /etc/firewall.conf ]; then
     echo -n "Loading default firewall values... "
     # Where is the iptables, rmmod and modprobe binaries?
     IPTABLES=/sbin/iptables
-    RMMOD=/sbin/rmmod
-    MODPROBE=/sbin/modprobe
+    RMMOD="/sbin/rmmod > /dev/null 2>&1 "
+    MODPROBE="/sbin/modprobe > /dev/null 2>&1 "
     #
     # External ethernet device
     EXTERNAL_ETH=eth0
@@ -204,13 +204,14 @@ case "$1" in
 	    echo -n "Setting up masquerading of network $INTERNAL_NET on $INTERNAL_ETH... "
 	    echo 1 > /proc/sys/net/ipv4/ip_forward 
 	    $MODPROBE ip_nat_ftp
+	    $MODPROBE ip_nat_irc
 
 	    $IPTABLES -t nat -A POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
 	    echo "done."
 
 	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then
 		echo -n "VPN masquerading $PPTP_CLIENT to $PPTP_SERVER: "
-		$MODPROBE iptable_nat
+		$MODPROBE ip_nat_pptp
 		$IPTABLES -t nat -A PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
 		$IPTABLES -t nat -A PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
 		echo "done."
@@ -254,16 +255,20 @@ case "$1" in
 	    $IPTABLES -t nat -D POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
 
 	    echo 0 > /proc/sys/net/ipv4/ip_forward 
-	    $RMMOD ip_conntrack_ftp
-	    $RMMOD ip_conntrack
-	    $RMMOD ip_nat_ftp
+
 	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then
 #		$IPTABLES -t nat -D PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
 #		$IPTABLES -t nat -D PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
 
-		$RMMOD iptable_nat
 	    fi
 	    echo "done."
+
+	    echo -n "Unloading module: "
+	    for module in "ip_nat_ftp ip_nat_irc ip_conntrack_ftp ip_conntrack_irc iptable_nat ip_conntrack ip_tables"; do
+		echo -n "$module "
+		$RMMOD $module
+	    done
+	    echo
 	fi
 
 	# -------------
@@ -285,7 +290,15 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.7  2002-03-03 21:05:13  turbo
+# Revision 1.8  2002-03-03 21:17:07  turbo
+# * Send all output from rmmod/modprobe to /dev/null.
+# * Load the ip_nat_irc module if forwarding/masquerading.
+# * If masquerading to a PPTP server, load the ip_nat_pptp module, not
+#   iptable_nat.
+# * Remove the modules in right order. ip_nat* first, then the ip_conntrack*.
+#   Do this in a for loop.
+#
+# Revision 1.7  2002/03/03 21:05:13  turbo
 # We might have ip tables as a module, so if we don't have the support in
 # the kernel (/proc/ksyms), we check to see if we have the actual module
 # (in /lib/modules/KERNELVER/kernel/net/ipv4/netfilter).
