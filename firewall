@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.10 2002-03-03 21:34:53 turbo Exp $
+# $Id: firewall,v 1.11 2002-03-03 23:06:51 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -109,7 +109,7 @@ chains () {
 
     # -------------
     # Some local exeptions
-    if [ "$EXTERNAL_NET" != "" ]; then
+    if [ "$EXTERNAL_NET" != "" -a "$ALLOW" != "" ]; then
 	echo -n "Setting up local accepts: "
 	for port in $ALLOW; do
 	    echo -n "$port "
@@ -126,15 +126,16 @@ chains () {
     if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
 	echo -n "Setting up accept to/from the internal network: "
 	for port in $PORTS; do
+	    echo -n "$port "
 	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp --dport $port
 	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol udp --dport $port
 	done
-	echo " done."
+	echo
     fi
 
     # -------------
     # Setting up TCP rejects
-    echo -n "Setting up TCP rejects: "
+    echo -n "Setting up TCP rejects on external IP: "
     for port in $PORTS; do
 	echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j REJECT --reject-with tcp-reset --protocol tcp --dport $port
@@ -143,7 +144,7 @@ chains () {
 
     # -------------
     # Setting up UDP rejects
-    echo -n "Setting up UDP rejects: "
+    echo -n "Setting up UDP rejects on external IP: "
     for port in $PORTS; do
 	echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j DROP  --protocol udp --dport $port
@@ -256,8 +257,8 @@ case "$1" in
 	    echo 0 > /proc/sys/net/ipv4/ip_forward 
 
 	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then
-#		$IPTABLES -t nat -D PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
-#		$IPTABLES -t nat -D PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
+		$IPTABLES -t nat -D PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
+		$IPTABLES -t nat -D PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
 
 	    fi
 	    echo "done."
@@ -289,7 +290,14 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.10  2002-03-03 21:34:53  turbo
+# Revision 1.11  2002-03-03 23:06:51  turbo
+# * Only setup the local accepts if the variable ALLOW is non-null.
+# * Output the ports we're doing local accept on.
+# * Be more clear about the rejects entries (... on external/internal IP).
+# * Uncomment the iptables entries for PPTP server masquerading.
+#   The 'if/fi' block failed othervise...
+#
+# Revision 1.10  2002/03/03 21:34:53  turbo
 # Remove the ip_conntrack_pptp as well when disabling masquerading.
 #
 # Revision 1.9  2002/03/03 21:27:34  turbo
