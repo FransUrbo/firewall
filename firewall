@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.13 2002-03-04 12:07:49 turbo Exp $
+# $Id: firewall,v 1.14 2002-06-25 08:37:06 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -8,7 +8,7 @@ if [ ! -f /etc/firewall.conf ]; then
     echo -n "Loading default firewall values... "
     # Where is the iptables, rmmod and modprobe binaries?
     IPTABLES=/sbin/iptables
-    RMMOD="/sbin/rmmod > /dev/null 2>&1 "
+    RMMOD="/sbin/rmmod"
     MODPROBE="/sbin/modprobe > /dev/null 2>&1 "
     #
     # External ethernet device
@@ -97,8 +97,10 @@ get_ip () {
 chains () {
     if [ "$1" = "add" ]; then
         CHAIN="-A INPUT "
+	ECHO="Setting up"
     else
         CHAIN="-D INPUT "
+	ECHO="Removing"
     fi
     CHAIN="$IPTABLES $CHAIN"
 
@@ -106,7 +108,8 @@ chains () {
     # -------------
     # Some local exeptions
     if [ "$EXTERNAL_NET" != "" -a "$ALLOW" != "" ]; then
-	echo -n "Setting up local accepts: "
+	echo -n "$ECHO local accepts: "
+
 	for port in $ALLOW; do
 	    echo -n "$port "
 	    if [ "$EXTERNAL_NET" != "" ]; then
@@ -120,7 +123,8 @@ chains () {
     # -------------
     # Setting up accepts on PORT to/from our local network
     if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
-	echo -n "Setting up accept to/from the internal network: "
+	echo -n "$ECHO accept to/from the internal network: "
+
 	for port in $PORTS; do
 	    echo -n "$port "
 	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp --dport $port
@@ -131,7 +135,7 @@ chains () {
 
     # -------------
     # Setting up TCP rejects
-    echo -n "Setting up TCP rejects on external IP: "
+    echo -n "$ECHO TCP rejects on external IP: "
     for port in $PORTS; do
 	echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j REJECT --reject-with tcp-reset --protocol tcp --dport $port
@@ -140,7 +144,7 @@ chains () {
 
     # -------------
     # Setting up UDP rejects
-    echo -n "Setting up UDP rejects on external IP: "
+    echo -n "$ECHO UDP rejects on external IP: "
     for port in $PORTS; do
 	echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j DROP  --protocol udp --dport $port
@@ -241,7 +245,7 @@ case "$1" in
 	# -------------
 	# Disable the portforwarding
 	if [ "$PORTS_FW" != "" ]; then
-	    echo "Removing port forwarding of port: "
+	    echo -n "Removing port forwarding of port: "
 	    for entry in $PORTS_FW; do
 		set -- `echo $entry | sed 's@:@ @g'`
 		echo -n "$1 "
@@ -253,7 +257,7 @@ case "$1" in
 	# -------------
 	# Portforwarding of internal traffic
 	if [ "$INTERNAL_NET" != "" ]; then
-	    echo "Removing internal network masquerading... "
+	    echo -n "Removing internal network masquerading... "
 	    $IPTABLES -t nat -D POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
 
 	    echo 0 > /proc/sys/net/ipv4/ip_forward 
@@ -292,7 +296,15 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.13  2002-03-04 12:07:49  turbo
+# Revision 1.14  2002-06-25 08:37:06  turbo
+# * We can't send STD{OUT,ERR} to /dev/null. For some reason
+#   the commandline think it's a module to remove. I'll look into
+#   that some other time...
+# * Output the correct lead text if removing/setting up firewall,
+#   by using different ECHO variable content.
+# * Don't output a newline if removing portforwarding (lead text).
+#
+# Revision 1.13  2002/03/04 12:07:49  turbo
 # If we have the file /etc/firewall.block.conf AND /usr/local/sbin/reject_ip is executable, block certain hosts (spammers and/or portscanners probably)
 #
 # Revision 1.12  2002/03/04 11:24:22  turbo
