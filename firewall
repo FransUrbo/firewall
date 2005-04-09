@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.18 2003-10-31 09:13:32 turbo Exp $
+# $Id: firewall,v 1.19 2005-04-09 09:35:15 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -209,6 +209,11 @@ case "$1" in
 		set -- `echo $entry | sed 's@:@ @g'`
 		echo -n "$1->$2:$3 "
 		$IPTABLES -t nat -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
+
+		if grep -q $1/udp /etc/services; then
+		    # There's a UDP entry for this port. Better to forward that to...
+		    $IPTABLES -t nat -A PREROUTING -p udp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
+		fi
 	    done
 	    echo ""
 	fi
@@ -311,7 +316,11 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.18  2003-10-31 09:13:32  turbo
+# Revision 1.19  2005-04-09 09:35:15  turbo
+# If there's an UDP entry for the port that's being forwarded, we need to do
+# a portforward on the UDP protocol in addition to the TCP proto...
+#
+# Revision 1.18  2003/10/31 09:13:32  turbo
 # Missing ] in 'if then fi'...
 #
 # Revision 1.17  2003/10/31 09:01:57  turbo
