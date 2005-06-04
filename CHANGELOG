@@ -1,0 +1,24 @@
+* 20050604
+  Setup connection/authentication attempt limits.
+  Idea taken from http://marc.theaimsgroup.com/?l=secure-shell&m=111565298029188&w=2
+  - Add to firewall.conf:
+    BRUTE_LIMIT="4:60"
+    BRUTE_RULE="22:SSH"
+    BRUTE_RULE="$BRUTE_RULE 8080:SQUID"
+    BRUTE_RULE="$BRUTE_RULE 389:LDAP"
+    BRUTE_RULE="$BRUTE_RULE 636:LDAPS"
+    BRUTE_RULE="$BRUTE_RULE 88:KRB5"
+    BRUTE_RULE="$BRUTE_RULE 749:KRB5Adm"
+    BRUTE_RULE="$BRUTE_RULE 751:KRB5Auth"
+
+    + The 'BRUTE_LIMIT' is 'attempts:within' (number of attempts within x seconds).
+    + The 'BRUTE_RULE' is _what_ to put limits on
+
+  - Some notes about this:
+    These rules will be added AFTER all the local exeptions and all your
+    friendly hosts will be added to a whitelist...
+
+  - You will need to have the following netfilter options in the kernel (either
+    as a module - recomended - or static inside the kernel):
+    CONFIG_IP_NF_MATCH_RECENT	recent match support
+    CONFIG_IP_NF_TARGET_LOG	LOG target support
