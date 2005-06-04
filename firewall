@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.20 2005-06-04 13:57:12 turbo Exp $
+# $Id: firewall,v 1.21 2005-06-04 14:06:46 turbo Exp $
 #DEBUG="echo "
 
 if [ ! -f /etc/firewall.conf ]; then
@@ -215,7 +215,7 @@ chains () {
 	echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j REJECT --reject-with tcp-reset --protocol tcp --dport $port
     done
-    echo "."
+    echo
 
     # -------------
     # Setting up UDP rejects
@@ -224,7 +224,7 @@ chains () {
 	echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j DROP  --protocol udp --dport $port
     done
-    echo "."
+    echo
 }
 
 # --------------------------------
@@ -236,7 +236,16 @@ fi
 
 # --------------------------------
 # Are we running a iptables enabled kernel!?
-if ! cat /proc/ksyms | grep -q ip_tables; then
+if [ -f "/proc/ksyms" ]; then
+    ksyms=/proc/ksyms
+elif [ -f "/proc/kallsyms" ]; then
+    ksyms=/proc/kallsyms
+else
+    echo 'No /proc/{ksyms,kallsyms} file!?'
+    exit 1
+fi
+    
+if ! cat $ksyms | grep -q ip_tables; then
     # Module not loaded, or no support for ip tables...
 
     if [ ! -f "/lib/modules/`uname -r`/kernel/net/ipv4/netfilter/ip_tables.o" ]; then
@@ -385,7 +394,11 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.20  2005-06-04 13:57:12  turbo
+# Revision 1.21  2005-06-04 14:06:46  turbo
+# Support Linux kernel version 2.6. In 2.6 the proc file is 'kallsyms', in
+# 2.4 it's 'ksyms'...
+#
+# Revision 1.20  2005/06/04 13:57:12  turbo
 # * Support debugging - echo the command instead of executing them
 #   - Don't execute the local script if debugging...
 # * If there is no network mask (/24, /32 etc), then default to '/24'.
