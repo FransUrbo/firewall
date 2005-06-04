@@ -22,3 +22,5 @@
     as a module - recomended - or static inside the kernel):
     CONFIG_IP_NF_MATCH_RECENT	recent match support
     CONFIG_IP_NF_TARGET_LOG	LOG target support
+    CONFIG_IP_NF_CONNTRACK	Connection tracking (required for masq/NAT)
+      CONFIG_IP_NF_MATCH_STATE	Connection state match support
