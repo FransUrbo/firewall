@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.21 2005-06-04 14:06:46 turbo Exp $
+# $Id: firewall,v 1.22 2005-06-05 09:24:19 turbo Exp $
 #DEBUG="echo "
 
 if [ ! -f /etc/firewall.conf ]; then
@@ -87,6 +87,11 @@ get_ip () {
 	set -- `ifconfig $INTERNAL_ETH | grep inet`; shift
 	INTERNAL_IP=`echo $1 | sed 's@addr:@@'`
 	INTERNAL_NET="$INTERNAL_IP/$INTERNAL_NET"
+
+	if echo $INTERNAL_ETH | grep -q ':'; then
+	    # It's an alias!
+	    INTERNAL_ETH=`echo $INTERNAL_ETH | sed 's@:.*@@'`
+       fi
     fi
 
     # Return ok if we have an external IP, and the internal IP is found
@@ -198,7 +203,7 @@ chains () {
 
 	    echo -n "$ECHO $name whitelisting: "
 
-	    for friend in $FRIENDLY; do
+	    for friend in 127.0.0.1 $EXTERNAL_IP $FRIENDLY; do
 		set -- `echo $friend | sed 's@:@ @g'` ; host=$1
 		echo -n "$host "
 
@@ -394,7 +399,13 @@ esac
 exit 0
 
 # $Log: firewall,v $
-# Revision 1.21  2005-06-04 14:06:46  turbo
+# Revision 1.22  2005-06-05 09:24:19  turbo
+# * Translate an ethernet alias (remove the ':.*' part) so that iptables
+#   won't complain.
+# * Always (!) add localhost and the external IP (?) to the connection
+#   limit whitelist(s).
+#
+# Revision 1.21  2005/06/04 14:06:46  turbo
 # Support Linux kernel version 2.6. In 2.6 the proc file is 'kallsyms', in
 # 2.4 it's 'ksyms'...
 #
