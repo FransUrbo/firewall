@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-# $Id: reject_ip,v 1.4 2005-01-06 13:32:58 turbo Exp $
+# $Id: reject_ip,v 1.5 2005-12-17 20:09:56 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -19,7 +19,7 @@ if [ ! -f /etc/firewall.conf ]; then
     EXTERNAL_NET=24
 else
     # Load the config file...
-    echo -n "Loading the firewall config file... "
+    echo -n "  Loading the firewall config file... "
     . /etc/firewall.conf
     echo "done."
 fi
@@ -46,19 +46,37 @@ get_ip () {
     # Get the external IP address
     set -- `ifconfig $EXTERNAL_ETH | grep inet`; shift
     EXTERNAL_IP=`echo $1 | sed 's@addr:@@'`
-    EXTERNAL_NET="$EXTERNAL_IP/$EXTERNAL_NET"
+
+    if [ ! -z "$EXTERNAL_NET" ]; then
+	EXTERNAL_NET="$EXTERNAL_IP/$EXTERNAL_NET"
+    else
+	# Got to have SOME default (othervise iptables
+	# complain about faulty netmask '').
+	EXTERNAL_NET="$EXTERNAL_IP/24"
+    fi
 
     # Get the internal IP address
     if [ "$INTERNAL_ETH" != "" ]; then
-	set -- `ifconfig $INTERNAL_ETH | grep inet`; shift
-	INTERNAL_IP=`echo $1 | sed 's@addr:@@'`
-	INTERNAL_NET="$INTERNAL_IP/$INTERNAL_NET"
+	for eth in $INTERNAL_ETH; do
+	    iface=`echo $eth | sed 's@/.*@@'`
+
+	    set -- `ifconfig $iface | grep inet`; shift
+	    ip=`echo $1 | sed 's@addr:@@'`
+	    mask=`echo $3 | sed 's@Mask:@@'`
+
+	    INTERNAL_IP="$INTERNAL_IP $eth/$ip/$mask"
+	    
+#	    if echo $INTERNAL_ETH | grep -q ':'; then
+#		# It's an alias!
+#		INTERNAL_ETH=`echo $INTERNAL_ETH | sed 's@:.*@@'`
+#	    fi
+	done
     fi
 
     # Return ok if we have an external IP, and the internal IP is found
     # If we haven't specified a internal ethernet interface, ignore the
     # unavilible internal IP...
-    if [ "$EXTERNAL_IP" == "" -o "$INTERNAL_IP" == "" -a "$INTERNAL_ETH" != "" ]; then
+    if [ "$EXTERNAL_IP" == "" -o "$INTERNAL_IP" == "" ]; then
         return 0
     fi
 
