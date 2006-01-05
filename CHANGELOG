@@ -1,3 +1,26 @@
+* 20051217
+  - Don't add the STDOUT/STDERR redirect (to /dev/null) in the variable
+    definition. It doesn't work that way, the module to load must be BEFORE
+    the redirect. We do the redirect etc in a function instead.
+  - Default netmask for the external network is 32 (one host).
+  - No more internal netmask. We get that from the interface at the same time
+    as we retreive it's IP address.
+  - Support multiple internal networks...
+  - Function get_net() added which extracts the network/netmask from an
+    INTERNAL_IP variable portion. Defined as 'interface/ipaddress/netmask'.
+  - Function debug() added which 'prettifies' the debug output.
+  - Rename the chains() function to chains_external() which is more in line
+    what the function does - adds rules to the EXTERNAL interface (only!).
+    + Prettify the debug output using both debug() and echo at the right place(s).
+    + Add support for DELETING the Brute Force rules.
+    + Remove the 'whitelist jump table(s)' (AFTER the brute force rules have
+      been cleared from the jump table(s)) when stop'ing the firewall.
+  - Move the stuff that sets up (and removes) the rules on the INTERNAL interface
+    to it's own function - chains_internal().
+    + Same changes as done to the chains_external() function...
+  - Support kernel version > 2.6, which module is suffixed with '.ko' instead
+    of '.o'.
+
 * 20050604
   Setup connection/authentication attempt limits.
   Idea taken from http://marc.theaimsgroup.com/?l=secure-shell&m=111565298029188&w=2
