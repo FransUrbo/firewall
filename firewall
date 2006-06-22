@@ -1,9 +1,10 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.24 2006-06-20 05:12:06 turbo Exp $
+# $Id: firewall,v 1.25 2006-06-22 19:02:50 turbo Exp $
 #DEBUG="echo "
+CONFIG=/etc/firewall.conf
 
-if [ ! -f /etc/firewall.conf ]; then
+if [ ! -f $CONFIG ]; then
     # The config file don't exists, load this script with default values...
     echo -n "Loading default firewall values... "
 
@@ -46,7 +47,7 @@ if [ ! -f /etc/firewall.conf ]; then
 else
     # Load the config file...
     echo -n "Loading the firewall config file... "
-    . /etc/firewall.conf
+    . $CONFIG
     echo "done."
 fi
 
@@ -315,12 +316,30 @@ case "$1" in
 	    echo -n "Forwarding external port: "
 	    for entry in $PORTS_FW; do
 		set -- `echo $entry | sed 's@:@ @g'`
-		echo -n "$1->$2:$3 "
-		$CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
 
-		if grep -q $1/udp /etc/services; then
-		    # There's a UDP entry for this port. Better to forward that to...
-		    $CHAIN -A PREROUTING -p udp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
+		if echo $1 | grep -q \-; then
+		    # Range mapping
+		    echo -n "$1->$2->$1"
+		    DEST=$2
+		    set -- `echo $1 | sed 's@-@ @'`
+		    i=$1
+		    while [ "$i" -le "$2" ]; do
+			$CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $i -j DNAT --to $DEST:$i
+
+			# Forward UDP port as well. TODO: Config option to specify if this is wanted?
+			$CHAIN -A PREROUTING -p udp -d $EXTERNAL_IP --dport $i -j DNAT --to $DEST:$i
+
+			i=`expr $i + 1`
+		    done
+		else
+		    # 1 to 1 mapping
+		    echo -n "$1->$2:$3 "
+		    $CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
+
+		    if grep -q $1/udp /etc/services; then
+			# There's a UDP entry for this port. Better to forward that to...
+			$CHAIN -A PREROUTING -p udp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
+		    fi
 		fi
 	    done
 	    echo ""
