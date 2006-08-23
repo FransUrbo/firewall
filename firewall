@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.25 2006-06-22 19:02:50 turbo Exp $
+# $Id: firewall,v 1.26 2006-08-23 05:52:17 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -11,7 +11,7 @@ if [ ! -f $CONFIG ]; then
     # Where is the iptables, rmmod and modprobe binaries?
     IPTABLES=/sbin/iptables
     RMMOD="/sbin/rmmod"
-    MODPROBE="/sbin/modprobe > /dev/null 2>&1 "
+    MODPROBE="/sbin/modprobe"
     #
     # External ethernet device
     EXTERNAL_ETH=eth0
@@ -104,6 +104,13 @@ get_ip () {
 
     # We have failed to obtain the IP addresses!
     return 1
+}
+
+# --------------------------------
+# Load a module
+load_module () {
+    $MODPROBE $1 > /dev/null 2>&1
+    return $?
 }
 
 # --------------------------------
@@ -350,15 +357,15 @@ case "$1" in
 	if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
 	    echo -n "Setting up masquerading of network $INTERNAL_NET on $INTERNAL_ETH... "
 	    [ -z "$DEBUG" ] && echo 1 > /proc/sys/net/ipv4/ip_forward 
-	    [ -z "$DEBUG" ] && $MODPROBE ip_nat_ftp
-	    [ -z "$DEBUG" ] && $MODPROBE ip_nat_irc
+	    [ -z "$DEBUG" ] && load_module ip_nat_ftp
+	    [ -z "$DEBUG" ] && load_module ip_nat_irc
 
 	    $CHAIN -A POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
 	    echo "done."
 
 	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then
 		echo -n "VPN masquerading $PPTP_CLIENT to $PPTP_SERVER: "
-		[ -z "$DEBUG" ] && $MODPROBE ip_nat_pptp
+		[ -z "$DEBUG" ] && load_module ip_nat_pptp
 		$CHAIN -A PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
 		$CHAIN -A PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
 		echo "done."

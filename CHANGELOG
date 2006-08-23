@@ -1,3 +1,8 @@
+* 20060823
+  - Can't call '/sbin/modprobe > /dev/null 2>&1 [module]'. Shell complains
+    that '>' is an unknown module. Instead create the wrapper function
+    load_module().
+
 * 20051217
   - Don't add the STDOUT/STDERR redirect (to /dev/null) in the variable
     definition. It doesn't work that way, the module to load must be BEFORE
