@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.26 2006-08-23 05:52:17 turbo Exp $
+# $Id: firewall,v 1.27 2006-09-03 11:26:13 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -131,25 +131,26 @@ chains () {
     # -------------
     # Some local exeptions
     if [ "$EXTERNAL_NET" != "" -a "$ALLOW" != "" ]; then
-	echo -n "$ECHO local accepts: "
+	echo -n "$ECHO local accepts: " ; [ -n "$DEBUG" ] && echo
 
 	for port in $ALLOW; do
-	    echo -n "$port "
+	    [ -z "$DEBUG" ] && echo -n "$port "
 	    if [ "$EXTERNAL_NET" != "" ]; then
 		$CHAIN -i $EXTERNAL_ETH -s $EXTERNAL_NET -d $EXTERNAL_IP -j ACCEPT --protocol tcp --dport $port
 		$CHAIN -i $EXTERNAL_ETH -s $EXTERNAL_NET -d $EXTERNAL_IP -j ACCEPT --protocol udp --dport $port
 	    fi
 	done
-	echo " done."
+	[ -z "$DEBUG" ] && echo " done."
+	[ -n "$DEBUG" ] && echo ""
     fi
 
     # -------------
     # Setting up accepts on PORT to/from our local network
     if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
-	echo -n "$ECHO accept to/from the internal network: "
+	echo -n "$ECHO accept to/from the internal network: " ; [ -n "$DEBUG" ] && echo
 
 	for port in $PORTS; do
-	    echo -n "$port "
+	    [ -z "$DEBUG" ] && echo -n "$port "
 	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp --dport $port
 	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol udp --dport $port
 	done
@@ -159,9 +160,10 @@ chains () {
     # -------------
     # Special circumstances - friendly hosts outside the external network
     if [ ! -z "$FRIENDLY" ]; then
-	echo -n "$ECHO friendly hosts: "
+	echo -n "$ECHO friendly hosts: " ; [ -n "$DEBUG" ] && echo
+
 	for friend in $FRIENDLY; do
-	    echo -n "$friend "
+	    [ -z "$DEBUG" ] && echo -n "$friend "
 
 	    set -- `echo $friend | sed 's@:@ @g'` ; host=$1 ; port=$2
 	    [ ! -z "$port" ] && port="--dport $port"
@@ -175,7 +177,7 @@ chains () {
     # -------------
     # Setup brute force limits
     if [ ! -z "$BRUTE_RULE" ]; then
-	echo -n "$ECHO brute force limits: "
+	echo -n "$ECHO brute force limits: " ; [ -n "$DEBUG" ] && echo
 
 	if [ ! -z "$BRUTE_LIMIT" ]; then
 	    set -- `echo $BRUTE_LIMIT | sed -e 's@ .*@@g' -e 's@:@ @'` ; attempts=$1 ; within=$2
@@ -185,7 +187,7 @@ chains () {
 
 	# Setup SSH connection attempts limits
 	for brute in $BRUTE_RULE; do
-	    echo -n "$brute "
+	    [ -z "$DEBUG" ] && echo -n "$brute "
 
 	    set -- `echo $brute | sed 's@:@ @g'` ; port=$1 ; name=$2
 	    list="$name"_WHITELIST ; logprefix="$name"_brute_force
@@ -193,7 +195,7 @@ chains () {
 	    # Setup the whitelist jump table
 	    if [ "$CMD" = "add" ]; then
 		$DEBUG$IPTABLES -N $list
-	    fi
+	    fi		
 
 	    $CHAIN -p tcp --dport $port -m state --state NEW -m recent \
 		--set --name $name
@@ -205,7 +207,7 @@ chains () {
 		--update --seconds $within --hitcount $attempts --rttl \
 		--name $name -j DROP
 
-	    if [ "$CMD" = "del" ]; then
+	    if [ "$CMD" = "rem" ]; then
 		# Remove the whitelist jump table
 		$DEBUG$IPTABLES -X $list
 	    fi
@@ -220,11 +222,11 @@ chains () {
 	    set -- `echo $brute | sed 's@:@ @g'` ; port=$1 ; name=$2
 	    list="$name"_WHITELIST
 
-	    echo -n "$ECHO $name whitelisting: "
+	    echo -n "$ECHO $name whitelisting: " ; [ -n "$DEBUG" ] && echo
 
 	    for friend in 127.0.0.1 $EXTERNAL_IP $FRIENDLY; do
 		set -- `echo $friend | sed 's@:@ @g'` ; host=$1
-		echo -n "$host "
+		[ -z "$DEBUG" ] && echo -n "$host "
 
 		if [ "$CMD" = "add" ]; then
 		    $DEBUG$IPTABLES -A $list -s $host -d $EXTERNAL_IP \
@@ -244,25 +246,25 @@ chains () {
 
     # -------------
     # Setting up TCP rejects
-    echo -n "$ECHO TCP rejects on external IP: "
+    echo -n "$ECHO TCP rejects on external IP: " ; [ -n "$DEBUG" ] && echo
     for port in $PORTS; do
-	echo -n "$port "
+	[ -z "$DEBUG" ] && echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j REJECT --reject-with tcp-reset --protocol tcp --dport $port
     done
     echo
 
     # -------------
     # Setting up UDP rejects
-    echo -n "$ECHO UDP rejects on external IP: "
+    echo -n "$ECHO UDP rejects on external IP: " ; [ -n "$DEBUG" ] && echo
     for port in $PORTS; do
-	echo -n "$port "
+	[ -z "$DEBUG" ] && echo -n "$port "
 	$CHAIN -i $EXTERNAL_ETH -s 0/0 -d $EXTERNAL_IP -j DROP --protocol udp --dport $port
     done
     echo
 
     # -------------
     # Deny connections to 127.0.0.1 via external interface
-    echo -n "$ECHO connections to 127.0.0.1 via external interface"
+    echo -n "$ECHO connections to 127.0.0.1 via external interface" ; [ -n "$DEBUG" ] && echo
     $CHAIN -i $EXTERNAL_ETH -d 127.0.0.1 -j REJECT --reject-with tcp-reset --protocol tcp
     $CHAIN -i $EXTERNAL_ETH -d 127.0.0.1 -j DROP --protocol udp
     echo
@@ -320,13 +322,13 @@ case "$1" in
 	# -------------
 	# Do portforwarding
 	if [ "$PORTS_FW" != "" ]; then
-	    echo -n "Forwarding external port: "
+	    echo -n "Forwarding external port: " ; [ -n "$DEBUG" ] && echo
 	    for entry in $PORTS_FW; do
 		set -- `echo $entry | sed 's@:@ @g'`
 
 		if echo $1 | grep -q \-; then
 		    # Range mapping
-		    echo -n "$1->$2->$1"
+		    [ -z "$DEBUG" ] && echo -n "$1->$2->$1"
 		    DEST=$2
 		    set -- `echo $1 | sed 's@-@ @'`
 		    i=$1
@@ -340,7 +342,7 @@ case "$1" in
 		    done
 		else
 		    # 1 to 1 mapping
-		    echo -n "$1->$2:$3 "
+		    [ -z "$DEBUG" ] && echo -n "$1->$2:$3 "
 		    $CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
 
 		    if grep -q $1/udp /etc/services; then
@@ -355,13 +357,14 @@ case "$1" in
 	# -------------
 	# Masquerade internal traffic
 	if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
-	    echo -n "Setting up masquerading of network $INTERNAL_NET on $INTERNAL_ETH... "
+	    echo -n "Setting up masquerading of network $INTERNAL_NET on $INTERNAL_ETH... " ; [ -n "$DEBUG" ] && echo
 	    [ -z "$DEBUG" ] && echo 1 > /proc/sys/net/ipv4/ip_forward 
 	    [ -z "$DEBUG" ] && load_module ip_nat_ftp
 	    [ -z "$DEBUG" ] && load_module ip_nat_irc
 
 	    $CHAIN -A POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
-	    echo "done."
+	    [ -z "$DEBUG" ] && echo " done."
+	    [ -n "$DEBUG" ] && echo ""
 
 	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then
 		echo -n "VPN masquerading $PPTP_CLIENT to $PPTP_SERVER: "
@@ -400,34 +403,36 @@ case "$1" in
 	# -------------
 	# Disable the portforwarding
 	if [ "$PORTS_FW" != "" ]; then
-	    echo -n "Removing port forwarding of port: "
+	    echo -n "Removing port forwarding of port: " ; [ -n "$DEBUG" ] && echo
 	    for entry in $PORTS_FW; do
 		set -- `echo $entry | sed 's@:@ @g'`
-		echo -n "$1 "
-		$CHAIN -D PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT  --to $2:$3
+		[ -z "$DEBUG" ] && echo -n "$1 "
+		$DEBUG$IPTABLES -t nat -D PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT  --to $2:$3
 	    done
-	    echo "done."
+	    [ -z "$DEBUG" ] && echo " done."
+	    [ -n "$DEBUG" ] && echo ""
 	fi
 
 	# -------------
 	# Portforwarding of internal traffic
 	if [ "$INTERNAL_NET" != "" ]; then
-	    echo -n "Removing internal network masquerading... "
-	    $CHAIN -D POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
+	    echo -n "Removing internal network masquerading... " ; [ -n "$DEBUG" ] && echo
+	    $DEBUG$IPTABLES -t nat -D POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
 
 	    [ -z "$DEBUG" ] && echo 0 > /proc/sys/net/ipv4/ip_forward 
 
 	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then
-		$CHAIN -D PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
-		$CHAIN -D PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
+		$DEBUG$IPTABLES -t nat -D PREROUTING -p tcp --dport 1723 -j DNAT --top $PPTP_CLIENT
+		$DEBUG$IPTABLES -t nat -D PREROUTING -p 47 -j DNAT --top $PPTP_CLIENT
 
 	    fi
-	    echo "done."
+	    [ -z "$DEBUG" ] && echo " done."
+	    [ -n "$DEBUG" ] && echo ""
 
-	    echo -n "Unloading module: "
-	    for module in "ip_nat_ftp ip_conntrack_ftp ip_nat_irc ip_conntrack_irc ip_nat_pptp ip_conntrack_pptp ipt_MASQUERADE iptable_nat ip_conntrack ipt_REJECT iptable_filter ip_tables"; do
-		echo -n "$module "
-		[ -z "$DEBUG" ] && $RMMOD $module > /dev/null 2>&1
+	    echo -n "Unloading module: " ; [ -n "$DEBUG" ] && echo
+	    for module in ip_nat_ftp ip_conntrack_ftp ip_nat_irc ip_conntrack_irc ip_nat_pptp ip_conntrack_pptp ipt_MASQUERADE iptable_nat ip_conntrack ipt_REJECT iptable_filter ip_tables; do
+		[ -z "$DEBUG" ] && echo -n "$module "
+		$DEBUG$RMMOD $module 2> /dev/null
 	    done
 	    echo
 	fi
