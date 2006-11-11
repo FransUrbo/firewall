@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.27 2006-09-03 11:26:13 turbo Exp $
+# $Id: firewall,v 1.28 2006-11-11 10:29:25 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -172,6 +172,18 @@ chains () {
 	    $CHAIN -i $EXTERNAL_ETH -s $host -d $EXTERNAL_IP -j ACCEPT --protocol udp $port
 	done
 	echo
+    fi
+
+    # -------------
+    if [ ! -z "$DO_IPSEC_RULES" ]; then
+	# IPSEC hack
+	$CHAIN -t mangle -i $EXTERNAL_ETH -p udp --dport  500 -j MARK --set-mark 1
+	$CHAIN -t mangle -i $EXTERNAL_ETH -p udp --dport 4500 -j MARK --set-mark 1
+	$CHAIN -t mangle -i $EXTERNAL_ETH -p esp              -j MARK --set-mark 1
+	$CHAIN -t mangle -i $EXTERNAL_ETH -p  ah              -j MARK --set-mark 1
+
+	$CHAIN -m mark --mark 1 -j ACCEPT
+	iptables -A FORWARD -m mark --mark 1 -j ACCEPT
     fi
 
     # -------------

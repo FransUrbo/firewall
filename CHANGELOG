@@ -1,3 +1,6 @@
+* 20061111
+  - Add support for IPSEC rules on EXTERNAL_INTERFACE.
+
 * 20060823
   - Can't call '/sbin/modprobe > /dev/null 2>&1 [module]'. Shell complains
     that '>' is an unknown module. Instead create the wrapper function
