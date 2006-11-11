@@ -1,7 +1,8 @@
 * 20061111
   - Add support for IPSEC rules on EXTERNAL_INTERFACE.
   - Add support for syn-floods, port scans and ping-of-death.
-  + Need iptables > v1.2.6a for this!
+    + Need iptables > v1.2.6a for these two!
+  - Faulty use of 'get_ip && error'. Should be 'get_ip || error'.
 
 * 20060823
   - Can't call '/sbin/modprobe > /dev/null 2>&1 [module]'. Shell complains

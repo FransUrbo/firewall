@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-# $Id: reject_ip,v 1.5 2005-12-17 20:09:56 turbo Exp $
+# $Id: reject_ip,v 1.6 2006-11-11 11:03:51 turbo Exp $
 
 if [ ! -f /etc/firewall.conf ]; then
     # The config file don't exists, load this script with default values...
@@ -99,7 +99,7 @@ elif ! echo $1 | grep -q ^[a-z]; then
 fi
 
 # Get the required IP addresses (internal/external)
-get_ip && error 1 "Error in getting IP address(es)..."
+get_ip || error 1 "Error in getting IP address(es)..."
 
 if [ "$1" == "add" ]; then
     cmd=add
