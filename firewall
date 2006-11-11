@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.28 2006-11-11 10:29:25 turbo Exp $
+# $Id: firewall,v 1.29 2006-11-11 10:56:31 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -177,13 +177,26 @@ chains () {
     # -------------
     if [ ! -z "$DO_IPSEC_RULES" ]; then
 	# IPSEC hack
+	echo -n "$ECHO IPSEC rules: " ; [ -n "$DEBUG" ] && echo
 	$CHAIN -t mangle -i $EXTERNAL_ETH -p udp --dport  500 -j MARK --set-mark 1
 	$CHAIN -t mangle -i $EXTERNAL_ETH -p udp --dport 4500 -j MARK --set-mark 1
 	$CHAIN -t mangle -i $EXTERNAL_ETH -p esp              -j MARK --set-mark 1
 	$CHAIN -t mangle -i $EXTERNAL_ETH -p  ah              -j MARK --set-mark 1
 
 	$CHAIN -m mark --mark 1 -j ACCEPT
-	iptables -A FORWARD -m mark --mark 1 -j ACCEPT
+	$DEBUG$IPTABLES -A FORWARD -m mark --mark 1 -j ACCEPT
+	echo
+    fi
+
+    # -------------
+    # Setup protection from syn-floods, port scans and ping-of-death etc.
+    if [ ! -z "$DO_SYNPROT" ]; then
+	echo -n "$ECHO syn-flood etc protection: " ; [ -n "$DEBUG" ] && echo
+	$DEBUG$IPTABLES -A FORWARD -m limit -j LOG
+	$DEBUG$IPTABLES -A FORWARD -p tcp --syn -m limit --limit 1/s -j ACCEPT
+	$DEBUG$IPTABLES -A FORWARD -p tcp --tcp-flags SYN,ACK,FIN,RST RST -m limit --limit 1/s -j ACCEPT
+	$DEBUG$IPTABLES -A FORWARD -p icmp --icmp-type echo-request -m limit --limit 1/s -j ACCEPT
+	echo
     fi
 
     # -------------
