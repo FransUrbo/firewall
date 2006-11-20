@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.29 2006-11-11 10:56:31 turbo Exp $
+# $Id: firewall,v 1.30 2006-11-20 13:38:30 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -290,8 +290,8 @@ chains () {
     # -------------
     # Deny connections to 127.0.0.1 via external interface
     echo -n "$ECHO connections to 127.0.0.1 via external interface" ; [ -n "$DEBUG" ] && echo
-    $CHAIN -i $EXTERNAL_ETH -d 127.0.0.1 -j REJECT --reject-with tcp-reset --protocol tcp
-    $CHAIN -i $EXTERNAL_ETH -d 127.0.0.1 -j DROP --protocol udp
+    $CHAIN -i ! lo -s 127.0.0.0/8 -j DROP
+    $CHAIN -i ! lo -d 127.0.0.0/8 -j DROP
     echo
 }
 
