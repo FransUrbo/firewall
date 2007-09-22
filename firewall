@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.30 2006-11-20 13:38:30 turbo Exp $
+# $Id: firewall,v 1.31 2007-09-22 13:50:32 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -382,12 +382,16 @@ case "$1" in
 	# -------------
 	# Masquerade internal traffic
 	if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
-	    echo -n "Setting up masquerading of network $INTERNAL_NET on $INTERNAL_ETH... " ; [ -n "$DEBUG" ] && echo
+	    echo -n "Setting up masquerading of network: " ; [ -n "$DEBUG" ] && echo
 	    [ -z "$DEBUG" ] && echo 1 > /proc/sys/net/ipv4/ip_forward 
 	    [ -z "$DEBUG" ] && load_module ip_nat_ftp
 	    [ -z "$DEBUG" ] && load_module ip_nat_irc
 
-	    $CHAIN -A POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
+	    for masq in $INTERNAL_NET $MASQUERADE; do
+		echo -n "$masq "
+
+		$CHAIN -A POSTROUTING -s $masq -d 0/0 -j MASQUERADE
+	    done
 	    [ -z "$DEBUG" ] && echo " done."
 	    [ -n "$DEBUG" ] && echo ""
 
@@ -441,9 +445,11 @@ case "$1" in
 	# -------------
 	# Portforwarding of internal traffic
 	if [ "$INTERNAL_NET" != "" ]; then
-	    echo -n "Removing internal network masquerading... " ; [ -n "$DEBUG" ] && echo
-	    $DEBUG$IPTABLES -t nat -D POSTROUTING -s $INTERNAL_NET -d 0/0 -j MASQUERADE
-
+	    echo -n "Removing internal network masquerading: " ; [ -n "$DEBUG" ] && echo
+	    for masq in $NET $MASQUERADE; do
+		echo -n "$masq "
+		$DEBUG$IPTABLES -t nat -D POSTROUTING -s $masq -d 0/0 -j MASQUERADE
+	    done
 	    [ -z "$DEBUG" ] && echo 0 > /proc/sys/net/ipv4/ip_forward 
 
 	    if [ "$PPTP_SERVER" != "" -a "$PPTP_CLIENT" != "" ]; then

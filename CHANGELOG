@@ -1,3 +1,6 @@
+* 20070922
+  - Option to add additional networks to masquerade
+
 * 20061111
   - Add support for IPSEC rules on EXTERNAL_INTERFACE.
   - Add support for syn-floods, port scans and ping-of-death.
