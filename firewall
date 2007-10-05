@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.31 2007-09-22 13:50:32 turbo Exp $
+# $Id: firewall,v 1.32 2007-10-05 15:03:00 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -72,8 +72,9 @@ error () {
 # Find the IP address on the external interface
 get_ip () {
     # Get the external IP address
-    set -- `ifconfig $EXTERNAL_ETH | grep inet`; shift
+    set -- `ifconfig $EXTERNAL_ETH | grep 'inet '`; shift
     EXTERNAL_IP=`echo $1 | sed 's@addr:@@'`
+    EXTERNAL_NET=`echo $3 | sed 's@Mask:@@'`
 
     if [ ! -z "$EXTERNAL_NET" ]; then
 	EXTERNAL_NET="$EXTERNAL_IP/$EXTERNAL_NET"
@@ -85,8 +86,9 @@ get_ip () {
 
     # Get the internal IP address
     if [ "$INTERNAL_ETH" != "" ]; then
-	set -- `ifconfig $INTERNAL_ETH | grep inet`; shift
+	set -- `ifconfig $INTERNAL_ETH | grep 'inet '`; shift
 	INTERNAL_IP=`echo $1 | sed 's@addr:@@'`
+	INTERNAL_NET=`echo $3 | sed 's@Mask:@@'`
 	INTERNAL_NET="$INTERNAL_IP/$INTERNAL_NET"
 
 	if echo $INTERNAL_ETH | grep -q ':'; then
@@ -350,18 +352,20 @@ case "$1" in
 	    echo -n "Forwarding external port: " ; [ -n "$DEBUG" ] && echo
 	    for entry in $PORTS_FW; do
 		set -- `echo $entry | sed 's@:@ @g'`
+		source=$1 ; ip=$2 ; dest=$3
 
-		if echo $1 | grep -q \-; then
+		if echo $source | grep -q \-; then
 		    # Range mapping
-		    [ -z "$DEBUG" ] && echo -n "$1->$2->$1"
-		    DEST=$2
-		    set -- `echo $1 | sed 's@-@ @'`
-		    i=$1
-		    while [ "$i" -le "$2" ]; do
-			$CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $i -j DNAT --to $DEST:$i
+		    set -- `echo $source | sed 's@-@ @'`
+		    start=$1 ; end=$2
+
+		    i=$start
+		    while [ "$i" -le "$end" ]; do
+			[ -z "$DEBUG" ] && echo -n "$i->$ip:$i "
+			$CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $i -j DNAT --to $ip:$i
 
 			# Forward UDP port as well. TODO: Config option to specify if this is wanted?
-			$CHAIN -A PREROUTING -p udp -d $EXTERNAL_IP --dport $i -j DNAT --to $DEST:$i
+			$CHAIN -A PREROUTING -p udp -d $EXTERNAL_IP --dport $i -j DNAT --to $ip:$i
 
 			i=`expr $i + 1`
 		    done
@@ -370,10 +374,10 @@ case "$1" in
 		    [ -z "$DEBUG" ] && echo -n "$1->$2:$3 "
 		    $CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
 
-		    if grep -q $1/udp /etc/services; then
+#		    if grep -q $1/udp /etc/services; then
 			# There's a UDP entry for this port. Better to forward that to...
 			$CHAIN -A PREROUTING -p udp -d $EXTERNAL_IP --dport $1 -j DNAT --to $2:$3
-		    fi
+#		    fi
 		fi
 	    done
 	    echo ""
