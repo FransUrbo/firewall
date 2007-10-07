@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.33 2007-10-07 15:47:00 turbo Exp $
+# $Id: firewall,v 1.34 2007-10-07 16:23:05 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -360,10 +360,12 @@ case "$1" in
 		    start=$1 ; end=$2
 
 		    [ -z "$DEBUG" ] && echo -n "$start:$end->$ip "
-		    $CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $start:$end -j DNAT --to $ip:$start:$end
+		    $CHAIN -A PREROUTING -p tcp -d $EXTERNAL_IP --dport $start:$end -j DNAT --to $ip
 
-		    # Forward UDP port as well. TODO: Config option to specify if this is wanted?
-		    $CHAIN -A PREROUTING -p udp -d $EXTERNAL_IP --dport $start:$end -j DNAT --to $ip:$start:$end
+#		    if grep -q $1/udp /etc/services; then
+			# Forward UDP port as well. TODO: Config option to specify if this is wanted?
+			$CHAIN -A PREROUTING -p udp -d $EXTERNAL_IP --dport $start:$end -j DNAT --to $ip
+#		    fi
 		else
 		    # 1 to 1 mapping
 		    [ -z "$DEBUG" ] && echo -n "$1->$2:$3 "
