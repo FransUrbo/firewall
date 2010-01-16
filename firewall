@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.35 2010-01-16 18:39:29 turbo Exp $
+# $Id: firewall,v 1.36 2010-01-16 19:39:59 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -311,21 +311,55 @@ traffic () {
 	set -- `echo "$line"`
 	prot=$1 ; bytes=$3 ; mode=$4
 
-	if [ "$prot" == "tcp" ]; then
-	    bytes=`expr $bytes / 1024`k
+        if [ "$prot" == "tcp" ]; then
+            bytes=`expr $bytes / 1024`k
 
-	    src=`echo "$5" | sed 's@.*=@@'`:`echo "$7" | sed 's@.*=@@'`
-	    dst=`echo "$6" | sed 's@.*=@@'`:`echo "$8" | sed 's@.*=@@'`
-	else
-	    bytes="$bytes"b
+            src=`echo "$5" | sed 's@.*=@@'`
+            src_port=`echo "$7" | sed 's@.*=@@'`
+            dst=`echo "$6" | sed 's@.*=@@'`
+            dst_port=`echo "$8" | sed 's@.*=@@'`
 
-	    src=`echo "$4" | sed 's@.*=@@'`:`echo "$6" | sed 's@.*=@@'`
-	    dst=`echo "$5" | sed 's@.*=@@'`:`echo "$7" | sed 's@.*=@@'`
-	fi
+            if [ "$dst_port" != "9090" -a "$src_port" != "9090" ]; then
+                host=`host $src | sed 's@.* @@'`
+                if ! echo "$host" | grep -q NXDOMAIN; then
+                    src=$host
+                fi
 
-	if [ "$prot" == "udp" -o "$prot" == "tcp" -a "$mode" == "ESTABLISHED" ]; then
-	    printf "%3s %8s %25s -> %s\n" $prot $bytes $src $dst
-	fi
+                host=`host $dst | sed 's@.* @@'`
+                if ! echo "$host" | grep -q NXDOMAIN; then
+                    dst=$host
+                fi
+            fi
+
+            src=$src:$src_port
+            dst=$dst:$dst_port
+        else
+            bytes="$bytes"b
+
+            src=`echo "$4" | sed 's@.*=@@'`
+            src_port=`echo "$6" | sed 's@.*=@@'`
+            dst=`echo "$5" | sed 's@.*=@@'`
+            dst_port=`echo "$7" | sed 's@.*=@@'`
+
+            if [ "$dst_port" != "9090" -a "$src_port" != "9090" ]; then
+                host=`host $src | sed 's@.* @@'`
+                if ! echo "$host" | grep -q NXDOMAIN; then
+                    src=$host
+                fi
+
+                host=`host $dst | sed 's@.* @@'`
+                if ! echo "$host" | grep -q NXDOMAIN; then
+                    dst=$host
+                fi
+            fi
+
+            src=$src:$src_port
+            dst=$dst:$dst_port
+        fi
+
+        if [ "$prot" == "udp" -o "$prot" == "tcp" -a "$mode" == "ESTABLISHED" ]; then
+            printf "%3s %8s %s -> %s\n" $prot $bytes $src $dst
+        fi
     done
 }
 
