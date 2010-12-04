@@ -1,0 +1,118 @@
+# $Id: firewall.conf.TURBO,v 1.1 2010-12-04 10:13:50 turbo Exp $
+
+# Where is the iptables, rmmod and modprobe binaries?
+IPTABLES=/sbin/iptables
+RMMOD="/sbin/rmmod"
+MODPROBE="/sbin/modprobe"
+#
+# External ethernet device
+EXTERNAL_ETH=eth1
+#
+# If defined, see 'ALLOW' below for ports to allow on local network
+# ('size' of the network).
+#   24 => a C-Net
+#   32 => one host
+EXTERNAL_NET=32
+#
+# --- FOR MASQUERADING ---
+# Internal ethernet device
+INTERNAL_ETH="eth0"
+#
+# If defined, masquerade from internal client to the PPTP VPN Server
+# - If the PPTP server is located on the inside, don't specify here, add
+#   the IP to PORTS_FW (for portforwarding) instead...
+# TODO: Don't work yet...
+#PPTP_SERVER=212.247.15.77
+#PPTP_CLIENT=192.168.1.10
+#
+# If defined, do transparent proxy'ing...
+# - This is the proxy port on localhost
+#TRANS_PROXY=8080
+#
+DO_IPSEC_RULES=1
+
+# ----- PORTS TO BLOCK ----
+# ':' is a range... So ':19' means '0 to 19'...
+PORTS=":19"				# Block: 0-19
+PORTS="$PORTS 26:49"			# Open:  ssh, telnet, smtp
+PORTS="$PORTS 52"			# Open:  ESP & AH (IPSec)
+PORTS="$PORTS 54:79"			# Open:  domain
+PORTS="$PORTS 81:87"			# Open:  http
+PORTS="$PORTS 89:109"			# Open:  kerberos, pop3
+PORTS="$PORTS 111"			# Close: SunRPC
+PORTS="$PORTS 115:142"			# Open:  Auth, SFTP
+PORTS="$PORTS 144:187"			# Open:  Google Voice Chat (UDP only needed)
+PORTS="$PORTS 189:331"			# Open:  Google Video Chat (UDP only needed)
+PORTS="$PORTS 333:388"			# Open:  ldap
+PORTS="$PORTS 390:442"			# Open:  imap2
+PORTS="$PORTS 444:499"			# Open:  https
+PORTS="$PORTS 501:635"			# Open:  IKE (IPSec)
+PORTS="$PORTS 637:992"			# Open:  ldaps
+PORTS="$PORTS 994"			# Open:  imaps
+PORTS="$PORTS 996:1023"			# Open:  pop3s
+PORTS="$PORTS 1061 1214 1832"		# Block: Crappy filesharing protocols
+PORTS="$PORTS 3306"			# Block: mysql
+PORTS="$PORTS 6000"			# Block: X11
+PORTS="$PORTS 9100:9200"		# Block 9100-9200 (bacula etc)
+
+# ----- PORTS TO ALLOW ON LOCAL NET -----
+#ALLOW="$ALLOW 8080 3128 3130 3401"	# Squid
+
+# ----- PORTS TO FORWARD FROM EXTERNAL TO INTERNAL -----
+# Syntax 1: EXTERNAL_PORT:INTERNAL_IP:INTERNAL_PORT
+# Syntax 2: EXTERNAL_PORT_RANGE:INTERNAL_IP
+# Range is something like: 100-200
+# Destination/internal port will be identical to the external port.
+# I.e. it will be a 'one-to-one' mapping on the whole range.
+PORTS_FW=""
+
+# To: Celia
+PORTS_FW="$PORTS_FW   81:192.168.1.8:80"        # HTTP
+PORTS_FW="$PORTS_FW 2222:192.168.1.8:22"	# SSH
+PORTS_FW="$PORTS_FW 2401:192.168.1.8:2401"	# CVS
+PORTS_FW="$PORTS_FW 6998-7010:192.168.1.8"      # Bittorrent ports 6998-7010
+PORTS_FW="$PORTS_FW 16852:192.168.1.8:16852"	# Azureus
+PORTS_FW="$PORTS_FW 6880:192.168.1.8:6880"	# Azureus internal port
+
+# To: Astrix
+PORTS_FW="$PORTS_FW 2224:192.168.4.10:22"	# Asterisk SSH
+PORTS_FW="$PORTS_FW 8080:192.168.4.10:8080"	# Asterisk admin GUI
+PORTS_FW="$PORTS_FW 5060-5082:192.168.4.10"	# Asterisk
+PORTS_FW="$PORTS_FW 16384-16482:192.168.4.10"	# Asterisk RTP range
+PORTS_FW="$PORTS_FW 4569:192.168.4.10:4569"	# Asterisk IAX2
+PORTS_FW="$PORTS_FW 5036:192.168.4.10:5036"	# Asterisk IAX
+
+# ----- BRUTE FORCE LIMITS -----
+# Syntax: attempts:within
+# These are ports where one wants to limit connection/authentication
+# attempts. More than 'attempts' attempts within 'within' seconds will
+# be dropped (exactly 'attempts' attempts within 'within' seconds will
+# be logged).
+# NOTE: If not specified, 4:60 will be used.
+BRUTE_LIMIT="4:60" # NOTE: 'There can be only one!'
+
+# The actuall accept rule(s) - multi valued
+# Syntax: port:name
+# NOTE: These rules will be added AFTER all local exeptions and all
+#       your friendly hosts (below) will be added to a whitelist).
+# NOTE: Localhost (127.0.0.1 and external IP) will always be added
+#       to any whitelists!
+BRUTE_RULE="22:SSH"
+BRUTE_RULE="$BRUTE_RULE   23:TELNET"
+BRUTE_RULE="$BRUTE_RULE   25:SMTP"
+BRUTE_RULE="$BRUTE_RULE  161:SNMP"
+BRUTE_RULE="$BRUTE_RULE  500:ISA"
+BRUTE_RULE="$BRUTE_RULE  543:RLOGIN"
+BRUTE_RULE="$BRUTE_RULE 4500:IPSEC"
+
+# ----- FRIENDLY HOSTS:PORTS -----
+# Allow connection to PORT from IP.
+# This is hosts OUTSIDE the local network!
+# Syntax: IP:PORT
+FRIENDLY="192.168.1.8:22"			# SSH from Celia
+
+# ----- MASQUERADE ROUTES -----
+# Make sure net routes get masqueraded
+# Syntax: NETWORK/NETMASK
+MASQUERADE="192.168.4.0/24"
+MASQUERADE="192.168.100.0/24"
