@@ -1,4 +1,4 @@
-# $Id: firewall.conf.TURBO,v 1.1 2010-12-04 10:13:50 turbo Exp $
+# $Id: firewall.conf.TURBO,v 1.2 2011-10-06 20:51:07 turbo Exp $
 
 # Where is the iptables, rmmod and modprobe binaries?
 IPTABLES=/sbin/iptables
@@ -6,7 +6,7 @@ RMMOD="/sbin/rmmod"
 MODPROBE="/sbin/modprobe"
 #
 # External ethernet device
-EXTERNAL_ETH=eth1
+EXTERNAL_ETH=eth0
 #
 # If defined, see 'ALLOW' below for ports to allow on local network
 # ('size' of the network).
@@ -16,7 +16,7 @@ EXTERNAL_NET=32
 #
 # --- FOR MASQUERADING ---
 # Internal ethernet device
-INTERNAL_ETH="eth0"
+INTERNAL_ETH="eth1"
 #
 # If defined, masquerade from internal client to the PPTP VPN Server
 # - If the PPTP server is located on the inside, don't specify here, add
@@ -67,12 +67,13 @@ PORTS="$PORTS 9100:9200"		# Block 9100-9200 (bacula etc)
 PORTS_FW=""
 
 # To: Celia
-PORTS_FW="$PORTS_FW   81:192.168.1.8:80"        # HTTP
-PORTS_FW="$PORTS_FW 2222:192.168.1.8:22"	# SSH
-PORTS_FW="$PORTS_FW 2401:192.168.1.8:2401"	# CVS
-PORTS_FW="$PORTS_FW 6998-7010:192.168.1.8"      # Bittorrent ports 6998-7010
-PORTS_FW="$PORTS_FW 16852:192.168.1.8:16852"	# Azureus
-PORTS_FW="$PORTS_FW 6880:192.168.1.8:6880"	# Azureus internal port
+PORTS_FW="$PORTS_FW   80:192.168.69.8:80"	# HTTP
+PORTS_FW="$PORTS_FW   22:192.168.69.8:22"	# SSH
+PORTS_FW="$PORTS_FW 2222:192.168.69.8:22"	# SSH
+PORTS_FW="$PORTS_FW 2401:192.168.69.8:2401"	# CVS
+PORTS_FW="$PORTS_FW 6998-7010:192.168.69.8"	# Bittorrent ports 6998-7010
+PORTS_FW="$PORTS_FW 16852:192.168.69.8:16852"	# Azureus
+PORTS_FW="$PORTS_FW 6880:192.168.69.8:6880"	# Azureus internal port
 
 # To: Astrix
 PORTS_FW="$PORTS_FW 2224:192.168.4.10:22"	# Asterisk SSH
@@ -109,10 +110,9 @@ BRUTE_RULE="$BRUTE_RULE 4500:IPSEC"
 # Allow connection to PORT from IP.
 # This is hosts OUTSIDE the local network!
 # Syntax: IP:PORT
-FRIENDLY="192.168.1.8:22"			# SSH from Celia
+#FRIENDLY="192.168.69.8:22"			# SSH from Celia
 
 # ----- MASQUERADE ROUTES -----
 # Make sure net routes get masqueraded
 # Syntax: NETWORK/NETMASK
 MASQUERADE="192.168.4.0/24"
-MASQUERADE="192.168.100.0/24"
