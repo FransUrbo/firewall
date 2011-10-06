@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: firewall,v 1.37 2010-12-04 10:12:44 turbo Exp $
+# $Id: firewall,v 1.38 2011-10-06 19:26:21 turbo Exp $
 #DEBUG="echo "
 CONFIG=/etc/firewall.conf
 
@@ -147,16 +147,14 @@ chains () {
     fi
 
     # -------------
-    # Setting up accepts on PORT to/from our local network
+    # Setting up accepts from our local network
     if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
-	echo -n "$ECHO accept to/from the internal network: " ; [ -n "$DEBUG" ] && echo
+	echo -n "$ECHO accept from the internal network: " ; [ -n "$DEBUG" ] && echo
 
-	for port in $PORTS; do
-	    [ -z "$DEBUG" ] && echo -n "$port "
-	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp --dport $port
-	    $CHAIN -i $INTERNAL_ETH -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol udp --dport $port
-	done
-	echo
+	$CHAIN -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol tcp
+	$CHAIN -s $INTERNAL_NET -d $INTERNAL_IP -j ACCEPT --protocol udp
+
+	echo "done."
     fi
 
     # -------------
