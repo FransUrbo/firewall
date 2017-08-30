@@ -91,10 +91,10 @@ error () {
 # Find the IP address on the external interface
 get_ip () {
     # Get the external IP address
-    set -- `ifconfig $EXTERNAL_ETH | grep 'inet '`
+    set -- `ip a show $EXTERNAL_ETH | grep ' inet ' | head -n1`
     [ -z "${1}" ] && return 0
-    EXTERNAL_IP=`echo $2 | sed 's@addr:@@'`
-    EXTERNAL_NET=`echo $4 | sed 's@Mask:@@'`
+    EXTERNAL_IP="$(echo "${2}" | sed 's@/.*@@')"
+    EXTERNAL_NET="$(echo "${}" | sed 's@.*/@@')"
 
     if [ ! -z "$EXTERNAL_NET" ]; then
 	EXTERNAL_NET="$EXTERNAL_IP/$EXTERNAL_NET"
@@ -205,8 +205,8 @@ chains () {
 	debug $CHAIN -i $EXTERNAL_ETH -p esp              -j ACCEPT
 	debug $CHAIN -i $EXTERNAL_ETH -p  ah              -j ACCEPT
 
-	debug $CHAIN -m policy --dir in --pol ipsec -p udp --dport 1701 -j ACCEPT
-	debug $IPTABLES -A FORWARD -i ppp+ -p all -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+#	debug $CHAIN -m policy --dir in --pol ipsec -p udp --dport 1701 -j ACCEPT
+#	debug $IPTABLES -A FORWARD -i ppp+ -p all -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
 
 #	debug $CHAIN -i $EXTERNAL_ETH -p udp --dport  500 -j MARK --set-mark 1
 #	debug $CHAIN -i $EXTERNAL_ETH -p udp --dport 4500 -j MARK --set-mark 1
@@ -263,15 +263,16 @@ chains () {
 		debug $IPTABLES -N $list
 	    fi		
 
-	    debug $CHAIN -p tcp --dport $port -m state --state NEW -m recent \
-		--set --name $name
-	    debug $CHAIN -p tcp --dport $port -m state --state NEW -j $list
-	    debug $CHAIN -p tcp --dport $port -m state --state NEW -m recent \
-		--update --seconds $within --hitcount $attempts --rttl \
-		--name $name -j LOG --log-prefix $logprefix
-	    debug $CHAIN -p tcp --dport $port -m state --state NEW -m recent \
-		--update --seconds $within --hitcount $attempts --rttl \
-		--name $name -j DROP
+	    debug $CHAIN -p tcp -i $EXTERNAL_ETH -s $EXTERNAL_NET --dport $port \
+		-m state --state NEW -m recent --set --name $name
+	    debug $CHAIN -p tcp -i $EXTERNAL_ETH -s $EXTERNAL_NET --dport $port \
+		-m state --state NEW -j $list
+	    debug $CHAIN -p tcp -i $EXTERNAL_ETH -s $EXTERNAL_NET --dport $port \
+		-m state --state NEW -m recent --update --seconds $within \
+		--hitcount $attempts --rttl --name $name -j LOG --log-prefix $logprefix
+	    debug $CHAIN -p tcp -i $EXTERNAL_ETH -s $EXTERNAL_NET --dport $port \
+		-m state --state NEW -m recent --update --seconds $within \
+		--hitcount $attempts --rttl --name $name -j DROP
 
 	    if [ "$CMD" = "rem" ]; then
 		# Remove the whitelist jump table
@@ -508,12 +509,29 @@ case "$1" in
 	# -------------
 	# Masquerade internal traffic
 	if [ "$INTERNAL_NET" != "" -a "$INTERNAL_ETH" != "" ]; then
+	    if [ -n "$DO_IPSEC_RULES" ]; then
+		if [ -n "$MASQUERADE" ]; then
+		    # Accept any ipsec protected packets.
+		    debug $CHAIN -A POSTROUTING -m policy --dir out --pol ipsec -j ACCEPT
+		fi
+
+# TODO: This unfortunatly maches trafic within my local networks.
+# 192.168.128.0/17
+		echo -n "Reject packets with blacknet without a matching IPsec policy: " ; [ -n "$DEBUG" ] && echo
+		for net in 10.128.0.0/9 172.16.0.0/12; do
+		    [ -z "$DEBUG" ] && echo -n "$net "
+		    debug iptables -A FORWARD -d "$net" -m policy --pol none --dir out -j REJECT --reject-with icmp-admin-prohibited
+		done
+		[ -z "$DEBUG" ] && echo " done."
+		[ -n "$DEBUG" ] && echo ""
+	    fi
+
 	    echo -n "Setting up masquerading of network: " ; [ -n "$DEBUG" ] && echo
 	    [ -z "$DEBUG" ] && echo 1 > /proc/sys/net/ipv4/ip_forward 
 	    [ -z "$DEBUG" ] && load_module ip_nat_ftp
 	    [ -z "$DEBUG" ] && load_module ip_nat_irc
 
-	    for masq in $INTERNAL_NET $MASQUERADE; do
+	    for masq in $MASQUERADE; do
 		[ -z "$DEBUG" ] && echo -n "$masq "
 
 		debug $CHAIN -A POSTROUTING -s $masq -d 0/0 -j MASQUERADE
@@ -532,9 +550,26 @@ case "$1" in
 
 	# -------------
 	# Enable the transparent proxy (force all connection through the proxy)
-	if [ ! -z "$TRANS_PROXY" -a "$TRANS_PROXY" != "0" ]; then
+	if [ -n "$TRANS_PROXY" -a "$TRANS_PROXY" != "0" ]; then
+	    [ -z "$TRANS_PROXY_NET" ] && TRANS_PROXY_NET="$INTERNAL_NET"
+	    if echo "$TRANS_PROXY" | grep -q ":"; then
+		set -- $(echo "$TRANS_PROXY" | sed 's@:@ @')
+		PROXY_HOST="$1"
+		PROXY_PORT="$2"
+	    else
+		PROXY_HOST="$INTERNAL_IP"
+		PROXY_PORT="$TRANS_PROXY"
+	    fi
+
 	    echo -n "Setting up transparent proxy: "
-	    debug $CHAIN -A PREROUTING -s $INTERNAL_NET -d 0/0 --protocol tcp --destination-port 80 -j REDIRECT --to-ports $TRANS_PROXY
+# TODO: This proxys on all networks!
+	    # http://www.linuxhomenetworking.com/wiki/index.php/Quick_HOWTO_:_Ch32_:_Controlling_Web_Access_with_Squid#Making_Your_Squid_Server_Transparent_To_Users
+	    debug $IPTABLES -t nat -A PREROUTING -p tcp -i $INTERNAL_ETH ! -s $PROXY_HOST --dport 80 -j DNAT --to ${PROXY_HOST}:${PROXY_PORT}
+	    for net in $TRANS_PROXY_NET; do
+		debug $IPTABLES -t nat -A POSTROUTING -o $INTERNAL_ETH -s $net -d $PROXY_HOST -j SNAT --to $INTERNAL_IP
+#		debug $IPTABLES -A FORWARD -s $net -d $PROXY_HOST -i $INTERNAL_ETH -o $INTERNAL_ETH -m state --state NEW,ESTABLISHED,RELATED -p tcp --dport $PROXY_PORT -j ACCEPT
+#		debug $IPTABLES -A FORWARD -d $net -s $PROXY_HOST -i $INTERNAL_ETH -o $INTERNAL_ETH -m state --state ESTABLISHED,RELATED -p tcp --sport $PROXY_PORT -j ACCEPT
+	    done
 	    echo "done."
 	fi
 
@@ -545,8 +580,8 @@ case "$1" in
 
 	# -------------
 	# Execute local scripts
-	if [ -x "$0.local" -a -z "$DEBUG" ]; then
-	    $0.local start
+	if [ -x "/etc/firewall.local" -a -z "$DEBUG" ]; then
+	    /etc/firewall.local start
 	fi
 
 	# -------------
