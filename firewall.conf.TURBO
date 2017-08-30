@@ -1,4 +1,4 @@
-# $Id: firewall.conf.TURBO,v 1.2 2011-10-06 20:51:07 turbo Exp $
+# $Id: firewall.conf,v 1.10 2005/06/05 09:24:19 turbo Exp $
 
 # Where is the iptables, rmmod and modprobe binaries?
 IPTABLES=/sbin/iptables
@@ -6,7 +6,7 @@ RMMOD="/sbin/rmmod"
 MODPROBE="/sbin/modprobe"
 #
 # External ethernet device
-EXTERNAL_ETH=eth0
+EXTERNAL_ETH="eth0"
 #
 # If defined, see 'ALLOW' below for ports to allow on local network
 # ('size' of the network).
@@ -27,20 +27,22 @@ INTERNAL_ETH="eth1"
 #
 # If defined, do transparent proxy'ing...
 # - This is the proxy port on localhost
-#TRANS_PROXY=8080
+#TRANS_PROXY=192.168.69.8:3128
+#TRANS_PROXY_NET=10.0.0.0/12
 #
 DO_IPSEC_RULES=1
+DO_SYNPROT=1
 
 # ----- PORTS TO BLOCK ----
 # ':' is a range... So ':19' means '0 to 19'...
 PORTS=":19"				# Block: 0-19
 PORTS="$PORTS 26:49"			# Open:  ssh, telnet, smtp
-PORTS="$PORTS 52"			# Open:  ESP & AH (IPSec)
-PORTS="$PORTS 54:79"			# Open:  domain
+PORTS="$PORTS 52:79"			# Open:  ESP & AH (IPSec)
 PORTS="$PORTS 81:87"			# Open:  http
 PORTS="$PORTS 89:109"			# Open:  kerberos, pop3
 PORTS="$PORTS 111"			# Close: SunRPC
-PORTS="$PORTS 115:142"			# Open:  Auth, SFTP
+PORTS="$PORTS 115:122"			# Open:  NTP
+PORTS="$PORTS 124:142"			# Open:  Auth, SFTP
 PORTS="$PORTS 144:187"			# Open:  Google Voice Chat (UDP only needed)
 PORTS="$PORTS 189:331"			# Open:  Google Video Chat (UDP only needed)
 PORTS="$PORTS 333:388"			# Open:  ldap
@@ -56,32 +58,49 @@ PORTS="$PORTS 6000"			# Block: X11
 PORTS="$PORTS 9100:9200"		# Block 9100-9200 (bacula etc)
 
 # ----- PORTS TO ALLOW ON LOCAL NET -----
+ALLOW=""
+ALLOW="$ALLOW 123"			# NTP
 #ALLOW="$ALLOW 8080 3128 3130 3401"	# Squid
 
 # ----- PORTS TO FORWARD FROM EXTERNAL TO INTERNAL -----
 # Syntax 1: EXTERNAL_PORT:INTERNAL_IP:INTERNAL_PORT
 # Syntax 2: EXTERNAL_PORT_RANGE:INTERNAL_IP
+# Syntax 3: SOURCE_IP:EXTERNAL_PORT:INTERNAL_IP:INTERNAL_PORT
+# Syntax 4: SOURCE_IP:EXTERNAL_PORT_RANGE:INTERNAL_IP
+# 
 # Range is something like: 100-200
-# Destination/internal port will be identical to the external port.
+#
+# If port is not a range, then the destination/internal port will
+# be identical to the external port.
 # I.e. it will be a 'one-to-one' mapping on the whole range.
+#
+# The source IP can also be a CIDR.
 PORTS_FW=""
 
 # To: Celia
-PORTS_FW="$PORTS_FW   80:192.168.69.8:80"	# HTTP
-PORTS_FW="$PORTS_FW   22:192.168.69.8:22"	# SSH
-PORTS_FW="$PORTS_FW 2222:192.168.69.8:22"	# SSH
-PORTS_FW="$PORTS_FW 2401:192.168.69.8:2401"	# CVS
-PORTS_FW="$PORTS_FW 6998-7010:192.168.69.8"	# Bittorrent ports 6998-7010
-PORTS_FW="$PORTS_FW 16852:192.168.69.8:16852"	# Azureus
-PORTS_FW="$PORTS_FW 6880:192.168.69.8:6880"	# Azureus internal port
+PORTS_FW="$PORTS_FW          21:192.168.69.8:21"	# FTP
+PORTS_FW="$PORTS_FW          22:192.168.69.8:22"	# SSH
+PORTS_FW="$PORTS_FW          80:192.168.69.8:80"	# HTTP
+PORTS_FW="$PORTS_FW        2222:192.168.69.8:22"	# SSH
+PORTS_FW="$PORTS_FW        2401:192.168.69.8:2401"	# CVS
+PORTS_FW="$PORTS_FW   6998-7010:192.168.69.8"		# Bittorrent ports 6998-7010
+PORTS_FW="$PORTS_FW       16852:192.168.69.8:16852"	# Azureus
+PORTS_FW="$PORTS_FW        6880:192.168.69.8:6880"	# Azureus internal port
+PORTS_FW="$PORTS_FW       28000:192.168.69.8:32400"	# Plex Media Server
 
 # To: Astrix
-PORTS_FW="$PORTS_FW 2224:192.168.4.10:22"	# Asterisk SSH
-PORTS_FW="$PORTS_FW 8080:192.168.4.10:8080"	# Asterisk admin GUI
-PORTS_FW="$PORTS_FW 5060-5082:192.168.4.10"	# Asterisk
-PORTS_FW="$PORTS_FW 16384-16482:192.168.4.10"	# Asterisk RTP range
-PORTS_FW="$PORTS_FW 4569:192.168.4.10:4569"	# Asterisk IAX2
-PORTS_FW="$PORTS_FW 5036:192.168.4.10:5036"	# Asterisk IAX
+PORTS_FW="$PORTS_FW        2224:192.168.4.10:22"	# Asterisk SSH
+PORTS_FW="$PORTS_FW        8080:192.168.4.10:8080"	# Asterisk admin GUI
+PORTS_FW="$PORTS_FW   5060-5082:192.168.4.10"		# Asterisk
+PORTS_FW="$PORTS_FW 16384-16482:192.168.4.10"		# Asterisk RTP range
+PORTS_FW="$PORTS_FW        4569:192.168.4.10:4569"	# Asterisk IAX2
+PORTS_FW="$PORTS_FW        5036:192.168.4.10:5036"	# Asterisk IAX
+
+# To: Jenkins From: Github
+PORTS_FW="$PORTS_FW 192.30.252.0/22:22:192.168.4.19:22"
+PORTS_FW="$PORTS_FW 192.30.252.0/22:80:192.168.4.19:80"
+PORTS_FW="$PORTS_FW 192.30.252.0/22:443:192.168.4.19:443"
+PORTS_FW="$PORTS_FW 192.30.252.0/22:9418:192.168.4.19:9418"
 
 # ----- BRUTE FORCE LIMITS -----
 # Syntax: attempts:within
@@ -102,17 +121,28 @@ BRUTE_RULE="22:SSH"
 BRUTE_RULE="$BRUTE_RULE   23:TELNET"
 BRUTE_RULE="$BRUTE_RULE   25:SMTP"
 BRUTE_RULE="$BRUTE_RULE  161:SNMP"
-BRUTE_RULE="$BRUTE_RULE  500:ISA"
+BRUTE_RULE="$BRUTE_RULE  389:LDAP"
+#BRUTE_RULE="$BRUTE_RULE  500:ISA"
 BRUTE_RULE="$BRUTE_RULE  543:RLOGIN"
-BRUTE_RULE="$BRUTE_RULE 4500:IPSEC"
+BRUTE_RULE="$BRUTE_RULE  993:LDAPS"
+#BRUTE_RULE="$BRUTE_RULE 4500:IPSEC"
+BRUTE_RULE="$BRUTE_RULE 8080:SQUID"
+BRUTE_RULE="$BRUTE_RULE 3306:MYSQL"
 
 # ----- FRIENDLY HOSTS:PORTS -----
 # Allow connection to PORT from IP.
 # This is hosts OUTSIDE the local network!
 # Syntax: IP:PORT
-#FRIENDLY="192.168.69.8:22"			# SSH from Celia
+FRIENDLY=""
+#FRIENDLY="$FRIENDLY 212.209.42.132"	# AstraZeneca
+FRIENDLY="$FRIENDLY 192.168.69.0/24"	# Local network
 
 # ----- MASQUERADE ROUTES -----
 # Make sure net routes get masqueraded
 # Syntax: NETWORK/NETMASK
-MASQUERADE="192.168.4.0/24"
+MASQUERADE=""
+MASQUERADE="$MASQUERADE 192.168.4.0/24"
+MASQUERADE="$MASQUERADE 192.168.5.0/24"
+MASQUERADE="$MASQUERADE 192.168.63.0/24"
+MASQUERADE="$MASQUERADE 192.168.69.0/24"
+MASQUERADE="$MASQUERADE 10.0.0.0/12"
